@@ -191,7 +191,7 @@ def underwrite_backsolve(inputs, target_coc_pct, year_built=None,
 
     backsolve = None
     try:
-        backsolve = importlib.import_module("runs.backsolve_price_for_target_coc")
+        backsolve = importlib.import_module("engine.backsolve")
     except ImportError:
         import os
 
@@ -205,18 +205,18 @@ def underwrite_backsolve(inputs, target_coc_pct, year_built=None,
                 import importlib.util
 
                 spec = importlib.util.spec_from_file_location(
-                    "runs.backsolve_price_for_target_coc", path)
+                    "engine.backsolve", path)
                 module = importlib.util.module_from_spec(spec)
                 sys.modules.setdefault("runs", importlib.import_module("types"))
                 runs_pkg = sys.modules["runs"]
                 if not hasattr(runs_pkg, "__path__"):
                     runs_pkg.__path__ = [os.path.join(candidate, "runs")]
-                sys.modules["runs.backsolve_price_for_target_coc"] = module
+                sys.modules["engine.backsolve"] = module
                 spec.loader.exec_module(module)
                 backsolve = module
                 break
     if backsolve is None:
-        return _backend_unavailable("runs.backsolve_price_for_target_coc",
+        return _backend_unavailable("engine.backsolve",
                                     "plat-multifamily-underwriting")
 
     try:
@@ -318,7 +318,7 @@ def underwrite_backsolve(inputs, target_coc_pct, year_built=None,
         },
         "provenance": _provenance(
             "plat-multifamily-underwriting",
-            "runs.backsolve_price_for_target_coc (bisection over "
+            "engine.backsolve (bisection over "
             "engine.engine.run_underwriting)",
             engine_version=results_payload.get("engine_version"),
             arithmetic_owner="engine",
