@@ -596,9 +596,44 @@ def evaluate_bid(bid, estimate):
 
 # ------------------------------------------------------------------ ops_review
 
+# Documented default materiality policy for the synthetic walkthrough
+# snapshot (the same labeled example used across the harness docs/tests).
+DEFAULT_MATERIALITY = {"variance_abs": "500.00", "currency": "USD"}
+
+
+def _default_ops_snapshot_path():
+    """Resolve the harness package's shipped synthetic walkthrough snapshot.
+
+    Works for both an editable checkout and a wheel install (the harness
+    ships the walkthrough fixtures as package data). Synthetic data only.
+    """
+    from importlib.resources import as_file, files
+
+    with as_file(files("plat_harness").joinpath(
+            "samples_data/ops_snapshot.sqlite")) as path:
+        return str(path)
+
+
 def ops_review(asset_id, period=None, materiality=None, as_of_date=None,
-               db_path=None, variance_oracle_callable=None):
-    """Read-only ops review of exactly one property and one period."""
+               db_path=None, variance_oracle_callable=None,
+               no_variance=False):
+    """Read-only ops review of exactly one property and one period.
+
+    Defaults (so the tool works end-to-end over MCP stdio, where a client
+    can pass neither a host database path nor a callable):
+
+    - ``materiality`` defaults to the documented synthetic policy
+      ``{'variance_abs': '500.00', 'currency': 'USD'}``.
+    - ``db_path`` defaults to the harness package's shipped synthetic
+      walkthrough snapshot (synthetic data only, never a live feed).
+    - ``variance_oracle_callable`` defaults to the pinned
+      ``boxscore::variance`` owner port (``platworks.ops_oracle``), a
+      line-for-line port of the ops owner's pure Rust functions whose
+      values are pinned against the real Rust code in
+      ``tests/test_ops_oracle.py``. Pass ``no_variance=True`` for the
+      honest blocked review (``VARIANCE_NOT_IMPLEMENTED``) instead —
+      variance is never fabricated.
+    """
     if not asset_id or not isinstance(asset_id, str):
         return _error(
             "MISSING_INPUT",
@@ -612,23 +647,34 @@ def ops_review(asset_id, period=None, materiality=None, as_of_date=None,
             "A period (YYYY-MM) is required for an ops review.",
             "Pass exactly one analysis month, e.g. '2026-04'.",
         )
+    if materiality is None:
+        materiality = dict(DEFAULT_MATERIALITY)
     if not isinstance(materiality, dict) or not materiality.get("variance_abs"):
         return _error(
             "MISSING_INPUT",
             "A materiality policy is required for an ops review.",
             "Pass e.g. {'variance_abs': '500.00', 'currency': 'USD'}.",
         )
-    if not db_path:
-        return _error(
-            "MISSING_INPUT",
-            "A database path is required for an ops review.",
-            "Point at the ops SQLite database for this property, e.g. the "
-            "synthetic walkthrough snapshot.",
-        )
     try:
         from plat_harness.adapters.ops_review import review_period
     except ImportError:
         return _backend_unavailable("plat_harness", "plat-harness")
+    if not db_path:
+        try:
+            db_path = _default_ops_snapshot_path()
+        except Exception:
+            return _error(
+                "MISSING_INPUT",
+                "A database path is required for an ops review.",
+                "The harness snapshot fixture is not available in this "
+                "install; point db_path at the ops SQLite database for "
+                "this property.",
+            )
+    oracle = variance_oracle_callable
+    if oracle is None and not no_variance:
+        from platworks import ops_oracle as _owner_port
+
+        oracle = _owner_port.variance_oracle
     try:
         result = review_period(
             asset_id=asset_id,
@@ -636,7 +682,7 @@ def ops_review(asset_id, period=None, materiality=None, as_of_date=None,
             materiality=materiality,
             as_of_date=as_of_date,
             db_path=db_path,
-            variance_oracle=variance_oracle_callable,
+            variance_oracle=oracle,
         )
     except Exception as exc:
         code = getattr(exc, "code", None)

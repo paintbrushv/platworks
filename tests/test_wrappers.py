@@ -566,14 +566,33 @@ def test_ops_review_over_synthetic_snapshot():
     assert payload["period"] == "2026-04"
     assert payload["scope"]["properties_reviewed"] == 1
     assert payload["scope"]["periods_reviewed"] == 1
-    # no variance oracle bound -> honest blocked review, never fabricated
-    assert payload["status"] == "blocked"
-    codes = [rec["code"] for rec in payload["exceptions"]]
-    assert "VARIANCE_NOT_IMPLEMENTED" in codes
+    # the pinned boxscore::variance owner is bound by default, so the
+    # review reports real variance numbers (pinned against the real Rust
+    # functions in tests/test_ops_oracle.py), never fabricated ones
+    assert payload["status"] == "reviewed"
     prov = payload["provenance"]
     assert prov["service"] == "plat-harness"
     assert prov["entrypoint"] == "plat_harness.adapters.ops_review.review_period"
     assert prov["contract_version"] == "ops-review/1.0.0"
+    assert prov["variance_oracle_owner"] == "boxscore::variance"
+
+
+def test_ops_review_no_variance_is_an_honest_blocked_review():
+    """Opting out of the default oracle yields the honest blocked review
+    (VARIANCE_NOT_IMPLEMENTED), never a fabricated variance."""
+    payload = _assert_no_error(_call("ops_review", {
+        "asset_id": "synthetic_ops",
+        "period": "2026-04",
+        "materiality": {"variance_abs": "500.00", "currency": "USD"},
+        "as_of_date": "2026-04-30",
+        "db_path": _ops_snapshot_path(),
+        "no_variance": True,
+    }))
+    assert payload["status"] == "blocked"
+    codes = [rec["code"] for rec in payload["exceptions"]]
+    assert "VARIANCE_NOT_IMPLEMENTED" in codes
+    assert payload["variance"]["by_account"] == []
+    assert payload["variance"]["noi_bridge"] is None
 
 
 def test_ops_review_with_oracle_bound_reports_variance():
@@ -634,6 +653,30 @@ def test_ops_review_with_oracle_bound_reports_variance():
     assert variance["oracle_owner"] == "boxscore::variance"
 
 
+def test_ops_review_defaults_work_without_materiality_db_or_callable():
+    """End-to-end over the MCP server with only asset+period — the stdio
+    reality: a client can pass neither a host db path nor a callable.
+
+    Unspecified materiality and database default to the documented
+    synthetic walkthrough policy/snapshot; the pinned
+    boxscore::variance oracle is bound by default, so the review reports
+    the Rust-expected variance numbers."""
+    payload = _assert_no_error(_call("ops_review", {
+        "asset_id": "synthetic_ops",
+        "period": "2026-04",
+    }))
+    assert payload["status"] == "reviewed"
+    assert payload["variance"]["status"] == "provided"
+    assert payload["variance"]["oracle_owner"] == "boxscore::variance"
+    # Rust-expected values (see tests/test_ops_oracle.py)
+    assert payload["variance"]["noi_bridge"]["noi_variance"]["amount"] == "499.50"
+    assert payload["variance"]["noi_bridge"]["actual_noi"]["amount"] == "3799.50"
+    assert payload["variance"]["noi_bridge"]["budget_noi"]["amount"] == "3300.00"
+    # default materiality is the documented synthetic policy
+    assert payload["variance"]["materiality"] == {
+        "variance_abs": "500.00", "currency": "USD"}
+
+
 def test_ops_review_wildcard_asset_is_typed_refusal():
     _assert_error(_call("ops_review", {
         "asset_id": "*",
@@ -671,6 +714,52 @@ def test_product_tool_payloads_carry_no_private_paths():
 
 
 # --------------------------------------------------- stdio end-to-end (slow)
+
+@pytest.mark.slow
+def test_stdio_end_to_end_ops_review_with_defaults():
+    """The true end-to-end proof: drive ops_review through a real MCP stdio
+    client session with ONLY asset id + period — no materiality, no
+    database path, no callable (a stdio client can never pass one) — and
+    get the Rust-expected variance numbers back."""
+    import anyio
+    from mcp import ClientSession, StdioServerParameters
+    from mcp.client.stdio import stdio_client
+
+    async def scenario():
+        params = StdioServerParameters(
+            command=sys.executable,
+            args=["-B", "-c",
+                  "import sys; sys.path.insert(0, %r); "
+                  "from platworks.mcp_server import main; main()"
+                  % os.path.join(REPO_ROOT, "src")],
+        )
+        async with stdio_client(params) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                res = await session.call_tool("ops_review", {
+                    "asset_id": "synthetic_ops",
+                    "period": "2026-04",
+                })
+                data = json.loads(res.content[0].text)
+                assert "error" not in data, data.get("error")
+                assert data["status"] == "reviewed"
+                variance = data["variance"]
+                assert variance["status"] == "provided"
+                assert variance["oracle_owner"] == "boxscore::variance"
+                # Rust-expected values: the real boxscore::variance owner
+                # functions over the same snapshot rows (pinned in
+                # tests/test_ops_oracle.py).
+                assert variance["noi_bridge"]["noi_variance"][
+                    "amount"] == "499.50"
+                assert variance["noi_bridge"]["actual_noi"][
+                    "amount"] == "3799.50"
+                assert variance["noi_bridge"]["budget_noi"][
+                    "amount"] == "3300.00"
+                assert variance["materiality"] == {
+                    "variance_abs": "500.00", "currency": "USD"}
+
+    anyio.run(scenario)
+
 
 @pytest.mark.slow
 def test_stdio_end_to_end_product_tools():

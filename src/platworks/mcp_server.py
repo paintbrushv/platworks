@@ -433,24 +433,27 @@ def build_server():
     def ops_review(asset_id: str | None = None, period: str | None = None,
                    materiality: object = None,
                    as_of_date: str | None = None, db_path: str | None = None,
-                   variance_oracle_callable=None) -> dict:
+                   no_variance: bool = False) -> dict:
         """Read-only review of one property and one period:
         occupancy, typed exceptions, oracle-bound variance only.
 
         The harness review reports occupancy change, feed freshness, and
         typed material exceptions with evidence citations. Missing budget
-        is a blocker, never zero; without a bound variance oracle the
-        review returns an honest VARIANCE_NOT_IMPLEMENTED blocked
-        status, never a fabricated variance. Refuses wildcard or
-        aggregate asset ids structurally. (The core arguments are
-        declared optional so missing-input refusals reach the client as
-        payloads instead of validation crashes.)
+        is a blocker, never zero. Variance comes only from the pinned
+        ``boxscore::variance`` owner — bound by default as the ported
+        deterministic oracle (values pinned against the real Rust
+        functions); pass ``no_variance`` for the honest
+        VARIANCE_NOT_IMPLEMENTED blocked status instead. Unspecified
+        materiality and database default to the documented synthetic
+        walkthrough policy/snapshot. Refuses wildcard or aggregate asset
+        ids structurally. (The core arguments are declared optional so
+        missing-input refusals reach the client as payloads instead of
+        validation crashes.)
         """
         return wrappers.call_product_tool("ops_review", {
             "asset_id": asset_id, "period": period,
             "materiality": materiality, "as_of_date": as_of_date,
-            "db_path": db_path,
-            "variance_oracle_callable": variance_oracle_callable,
+            "db_path": db_path, "no_variance": no_variance,
         })
 
     return server
