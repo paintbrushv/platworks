@@ -9,6 +9,11 @@ description = "Umbrella package and MCP server for the plat commercial-real-esta
 readme = "README.md"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.11"
+classifiers = [
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Office/Business :: Financial :: Accounting",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
 dependencies = [
     "mcp>=2.0",
     "anyio>=4.0",
