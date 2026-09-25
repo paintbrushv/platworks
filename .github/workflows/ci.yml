@@ -16,8 +16,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install
-        run: pip install -e ".[dev]"
+      - name: Install (with sibling backends from their public repos)
+        run: |
+          pip install -e ".[dev]"
+          # The 8 product tools wrap the sibling deterministic services; the
+          # stdio e2e tests exercise them for real. Until the siblings are on
+          # PyPI, install them from their public repositories.
+          pip install \
+            git+https://github.com/paintbrushv/plat-multifamily-underwriting.git \
+            git+https://github.com/paintbrushv/plat-costmodel.git \
+            git+https://github.com/paintbrushv/plat-harness.git
       - name: Test (full suite, stdio e2e included)
         run: pytest -q
       - name: Lint
