@@ -8,6 +8,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      PLAT_BOXSCORE_EXACT_BIN: ${{ github.workspace }}/ops-producer/boxscore/target/debug/boxscore-exact
+      CARGO_BUILD_JOBS: 2
+      CARGO_PROFILE_DEV_DEBUG: 0
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -16,15 +21,26 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install exact v0.1 baseline backends
+      - uses: actions/checkout@v4
+        with:
+          repository: paintbrushv/plat-operations
+          ref: e0da058007df564c23668626a4a6e131d0068854
+          path: ops-producer
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ops-producer/boxscore
+      - name: Build pinned exact-cent operating producer
+        run: cargo build --locked --manifest-path ops-producer/boxscore/Cargo.toml --bin boxscore-exact
+      - name: Install pinned financial-core backends
         run: |
           pip install -e ".[dev]"
-          # Source pins match the development baseline in plat-harness.
+          # Immutable implementation pins extend the recorded starting baseline.
           # PyPI releases currently lag these reviewed producer commits.
           pip install \
-            git+https://github.com/paintbrushv/plat-multifamily-underwriting.git@10a88ed393e6d6611c8c710b5e15ef64e128af6b \
+            git+https://github.com/paintbrushv/plat-multifamily-underwriting.git@b42764be7d0bf278272ff29ce36e0c98e2c10f5f \
             git+https://github.com/paintbrushv/plat-costmodel.git@518142ecb8771e52fcc9985237fe1a6f97a76168 \
-            git+https://github.com/paintbrushv/plat-harness.git@db85b94eedcba3dccb4db6b5a61a4623af870ca2
+            git+https://github.com/paintbrushv/plat-harness.git@53015df7835cc7495e40c3a4e6116dfdf4c2e213
           pip check
       - name: Verify catalog against recorded evidence
         run: python scripts/verify_catalog.py

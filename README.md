@@ -35,6 +35,8 @@ pip install -e ".[dev]"
 pytest
 ```
 
+Financial tools require their installed producers. See [financial-core setup and contracts](docs/financial-core.md), including the local Rust binary configuration.
+
 ## The MCP server
 
 The `platworks-mcp` console script (or `python -m platworks.mcp_server`) runs an MCP

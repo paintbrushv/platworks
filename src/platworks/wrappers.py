@@ -6,7 +6,7 @@ operations questions* by wrapping the real deterministic services from the
 plat ecosystem siblings:
 
 - ``plat-multifamily-underwriting`` (engine) — ``run_underwriting``, the
-  backsolve price core (``runs/backsolve_price_for_target_coc.py``), and
+  public price API (``engine.backsolve.backsolve_price``), and
   the statute-cited tax-regime schedule builder.
 - ``plat-costmodel`` — ``estimate_unit``, ``check_roi``, ``generate_sow``,
   ``evaluate_bid``.
@@ -31,7 +31,6 @@ Design rules (mirroring the MCP server's):
   no real deal, tenant, or portfolio data is referenced here.
 """
 
-import sys
 
 PRODUCT_TOOL_SPECS = (
     ("underwrite_run",
@@ -152,177 +151,49 @@ def _backend_unavailable(import_name, service_name):
 
 # -------------------------------------------------------- underwrite_backsolve
 
-def underwrite_backsolve(inputs, target_coc_pct, year_built=None,
-                         benchmark_5yr_treasury_pct=3.91,
-                         agency_spread_pct=1.5, min_price=1000000,
-                         max_price=100000000, max_iterations=40):
-    """Backsolve the highest purchase price meeting a target Year-1 CoC."""
+def underwrite_backsolve(inputs, target_coc_pct, policy=None, benchmark=None,
+                         min_price=1000000, max_price=100000000, max_iterations=40):
+    """Call the public engine search with an explicit policy and dated benchmark."""
     if not isinstance(inputs, dict):
-        return _error(
-            "INVALID_INPUT",
-            "inputs must be a canonical deal dict (engine schema v0.1).",
-            "Pass the canonical deal inputs object; see the plat-"
-            "multifamily-underwriting README for the schema.",
-        )
-    if target_coc_pct is None or not isinstance(target_coc_pct, (int, float)) \
-            or target_coc_pct <= 0:
-        return _error(
-            "INVALID_INPUT",
-            "target_coc_pct must be a positive number (e.g. 7.0 for 7%).",
-            "Provide the target Year-1 post-debt cash-on-cash return as a "
-            "percentage, e.g. 7.0.",
-        )
-    if not isinstance(max_iterations, int) or not 1 <= max_iterations <= 60:
-        max_iterations = 40
+        return _error("INVALID_INPUT", "inputs must be a canonical deal object.",
+                      "Supply canonical inputs, policy, and benchmark.")
     try:
-        from decimal import ROUND_HALF_UP, Decimal
+        from decimal import Decimal
 
-        from engine.property_tax import (
-            normalize_property_tax_purchase_price,
-            require_property_tax_policy,
-        )
+        from engine.backsolve import backsolve_price
+        from engine.backsolve_policy import BacksolveInputError, decimal_value
     except ImportError:
-        return _backend_unavailable("engine", "plat-multifamily-underwriting")
-
-    # The backsolve core lives in the engine repo's runs/ directory, which
-    # is not a package dependency — resolve it next to the installed
-    # engine package. If it is absent, refuse typed.
-    import importlib
-
-    backsolve = None
-    try:
-        backsolve = importlib.import_module("engine.backsolve")
-    except ImportError:
-        import os
-
-        engine_root = os.path.dirname(
-            __import__("engine", fromlist=["__name__"]).__file__)
-        runs_root = os.path.dirname(engine_root)
-        for candidate in (runs_root, os.path.dirname(runs_root)):
-            path = os.path.join(candidate, "runs",
-                               "backsolve_price_for_target_coc.py")
-            if os.path.exists(path):
-                import importlib.util
-
-                spec = importlib.util.spec_from_file_location(
-                    "engine.backsolve", path)
-                module = importlib.util.module_from_spec(spec)
-                sys.modules.setdefault("runs", importlib.import_module("types"))
-                runs_pkg = sys.modules["runs"]
-                if not hasattr(runs_pkg, "__path__"):
-                    runs_pkg.__path__ = [os.path.join(candidate, "runs")]
-                sys.modules["engine.backsolve"] = module
-                spec.loader.exec_module(module)
-                backsolve = module
-                break
-    if backsolve is None:
-        return _backend_unavailable("engine.backsolve",
+        return _backend_unavailable("engine.backsolve.backsolve_price",
                                     "plat-multifamily-underwriting")
-
     try:
-        require_property_tax_policy(inputs)
+        # Unit conversion only; the engine owns all validation and search.
+        target = decimal_value(target_coc_pct, "target_coc_pct", positive=True) / Decimal("100")
+        result = backsolve_price(
+            inputs, target_coc=target, policy=policy, benchmark=benchmark,
+            min_price=min_price, max_price=max_price, max_iterations=max_iterations,
+        )
+    except BacksolveInputError as exc:
+        return _error("INVALID_INPUT", str(exc),
+                      "Supply a supported policy and benchmark rate, as_of date, and source.")
     except Exception as exc:
-        return _error(
-            "ENGINE_REFUSAL",
-            f"The backsolve core refused this canonical: {exc}",
-            "A property tax policy (millage) is required before any price "
-            "search; add metadata.property_summary.property_tax_policy.",
-        )
-
-    target = Decimal(str(target_coc_pct)) / Decimal("100")
-    treasury = Decimal(str(benchmark_5yr_treasury_pct)) / Decimal("100")
-    spread = Decimal(str(agency_spread_pct)) / Decimal("100")
-
-    try:
-        prepared, _policy = backsolve._prepare_house_assumptions(
-            inputs,
-            year_built=year_built,
-            strategy="cashflow",
-            target_coc=target,
-            benchmark_treasury=treasury,
-            agency_spread=spread,
-            exit_cap_rate=Decimal(str(
-                (inputs.get("exit_assumptions") or {}).get("exit_cap_rate")
-                or 0.055)),
-            sale_cost_percent=Decimal("0.02"),
-            purchase_closing_cost_pct=Decimal("0.015"),
-            partnership_closing_costs=Decimal("50000"),
-            acquisition_fee_pct=Decimal("0.01"),
-            asset_management_fee_pct=Decimal("0.015"),
-            annual_partnership_expenses=Decimal("25000"),
-            disposition_fee_pct=Decimal("0.01"),
-            loan_closing_costs=Decimal("0"),
-            broker_snapshot=None,
-        )
-        projected_noi = backsolve._preview_projected_noi(prepared)
-
-        lo = normalize_property_tax_purchase_price(Decimal(str(min_price)))
-        hi = normalize_property_tax_purchase_price(Decimal(str(max_price)))
-
-        def evaluate(price):
-            case = backsolve._build_price_case(
-                prepared, price=price, target_coc=target,
-                year_built=year_built, benchmark_treasury=treasury,
-                agency_spread=spread,
-                purchase_closing_cost_pct=Decimal("0.015"),
-                partnership_closing_costs=Decimal("50000"),
-                acquisition_fee_pct=Decimal("0.01"),
-                loan_closing_costs=Decimal("0"),
-                projected_noi=projected_noi,
-            )
-            return case, backsolve._evaluate_case(case)
-
-        lo_case, (lo_results, lo_coc) = evaluate(lo)
-        hi_case, (hi_results, hi_coc) = evaluate(hi)
-        if not (lo_coc >= target and hi_coc <= target):
-            return _error(
-                "INFEASIBLE_BRACKET",
-                "The price bracket does not contain the target CoC "
-                f"(low {float(lo_coc) * 100:.2f}%, high "
-                f"{float(hi_coc) * 100:.2f}%).",
-                "Widen min_price/max_price or revisit the target return; "
-                "the engine will not extrapolate outside a proven bracket.",
-            )
-        solved_case, solved_results, solved_coc = lo_case, lo_results, lo_coc
-        iterations_run = 0
-        for _ in range(max_iterations):
-            mid = ((lo + hi) / Decimal("2")).quantize(
-                Decimal("0.01"), rounding=ROUND_HALF_UP)
-            case, (results, coc) = evaluate(mid)
-            iterations_run += 1
-            if coc >= target:
-                lo = mid
-                solved_case, solved_results, solved_coc = case, results, coc
-            else:
-                hi = mid
-    except Exception as exc:
-        return _error(
-            "ENGINE_REFUSAL",
-            f"The backsolve core refused this canonical: {exc}",
-            "Fix the named validation issue; the engine owns every refusal "
-            "reason.",
-        )
-
-    case_payload = _jsonable(solved_case)
-    results_payload = _jsonable(solved_results)
-    price = case_payload["purchase_assumptions"]["purchase_price"]
+        return _error("ENGINE_REFUSAL", f"The backsolve engine refused this canonical: {exc}",
+                      "Resolve the engine validation issue before pricing.")
+    summary = result["summary"]
     return {
-        "solved_price": price,
-        "achieved_coc_pct": float(solved_coc) * 100,
+        "contract_version": result["contract_version"], "status": result["status"],
+        "solved_price": summary.get("solved_purchase_price"),
+        "achieved_coc_pct": summary.get("achieved_coc_pct"),
         "target_coc_pct": target_coc_pct,
-        "iterations_run": iterations_run,
-        "case": case_payload,
-        "case_results": {
-            "engine_version": results_payload.get("engine_version"),
-            "metrics": results_payload.get("metrics"),
+        "iterations_run": summary.get("maximum_feasible_boundary", {}).get("iterations", 0),
+        "summary": summary, "effective_assumptions": result["effective_assumptions"],
+        "bracket": result["bracket"], "case": result["case"],
+        "case_results": None if result["results"] is None else {
+            "engine_version": result["results"].get("engine_version"),
+            "metrics": result["results"].get("metrics"),
         },
         "provenance": _provenance(
-            "plat-multifamily-underwriting",
-            "engine.backsolve (bisection over "
-            "engine.engine.run_underwriting)",
-            engine_version=results_payload.get("engine_version"),
-            arithmetic_owner="engine",
-            search="bisection, highest feasible price <= max_price",
+            "plat-multifamily-underwriting", "engine.backsolve.backsolve_price",
+            contract_version=result["contract_version"], arithmetic_owner="engine",
         ),
     }
 
@@ -626,13 +497,9 @@ def ops_review(asset_id, period=None, materiality=None, as_of_date=None,
       ``{'variance_abs': '500.00', 'currency': 'USD'}``.
     - ``db_path`` defaults to the harness package's shipped synthetic
       walkthrough snapshot (synthetic data only, never a live feed).
-    - ``variance_oracle_callable`` defaults to the pinned
-      ``boxscore::variance`` owner port (``platworks.ops_oracle``), a
-      line-for-line port of the ops owner's pure Rust functions whose
-      values are pinned against the real Rust code in
-      ``tests/test_ops_oracle.py``. Pass ``no_variance=True`` for the
-      honest blocked review (``VARIANCE_NOT_IMPLEMENTED``) instead —
-      variance is never fabricated.
+    - The default variance oracle calls the installed ``boxscore-exact`` Rust
+      binary using ``plat.ops/1``. Missing binaries and invalid cents refuse.
+      ``no_variance=True`` returns a review with a missing-oracle blocker.
     """
     if not asset_id or not isinstance(asset_id, str):
         return _error(
@@ -672,9 +539,9 @@ def ops_review(asset_id, period=None, materiality=None, as_of_date=None,
             )
     oracle = variance_oracle_callable
     if oracle is None and not no_variance:
-        from platworks import ops_oracle as _owner_port
+        from platworks import ops_oracle as _owner
 
-        oracle = _owner_port.variance_oracle
+        oracle = _owner.BoundOracle()
     try:
         result = review_period(
             asset_id=asset_id,
@@ -709,6 +576,8 @@ def ops_review(asset_id, period=None, materiality=None, as_of_date=None,
         if isinstance(result.get("variance"), dict) else None,
         read_only=True,
     )
+    if hasattr(oracle, "provenance"):
+        payload["provenance"]["operating_producer"] = oracle.provenance
     return payload
 
 

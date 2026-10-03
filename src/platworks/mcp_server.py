@@ -277,28 +277,22 @@ def build_server():
     @server.tool()
     def underwrite_backsolve(inputs: object = None,
                              target_coc_pct: float | None = None,
-                             year_built: int | None = None,
-                             benchmark_5yr_treasury_pct: float = 3.91,
-                             agency_spread_pct: float = 1.5,
+                             policy: dict | None = None,
+                             benchmark: dict | None = None,
                              min_price: float = 1000000,
                              max_price: float = 100000000,
                              max_iterations: int = 40) -> dict:
-        """Backsolve the highest price meeting a target Year-1
-        post-debt cash-on-cash return, via the engine's own search.
+        """Backsolve the highest price meeting a target Year-1 post-debt CoC.
 
-        The engine re-prices debt, tax, and equity for every candidate
-        price (bisection over full underwriting runs); the response
-        reports the solved price, the achieved CoC, the iteration count,
-        and the solved case's engine metrics. No price outside a proven
-        bracket is ever returned. (The core arguments are declared
-        optional so missing-input refusals reach the client as payloads
-        instead of validation crashes.)
+        Policy requires version plat.backsolve-policy/1 and strategy cashflow
+        or value_add. Benchmark requires a fractional rate, YYYY-MM-DD as_of,
+        and source. target_coc_pct uses percent units (7 means 7%). Results
+        distinguish convergence, a feasible ceiling, infeasibility, and an
+        exhausted search; assumptions and tested bounds are returned.
         """
         return wrappers.call_product_tool("underwrite_backsolve", {
             "inputs": inputs, "target_coc_pct": target_coc_pct,
-            "year_built": year_built,
-            "benchmark_5yr_treasury_pct": benchmark_5yr_treasury_pct,
-            "agency_spread_pct": agency_spread_pct,
+            "policy": policy, "benchmark": benchmark,
             "min_price": min_price, "max_price": max_price,
             "max_iterations": max_iterations,
         })
@@ -440,9 +434,10 @@ def build_server():
         The harness review reports occupancy change, feed freshness, and
         typed material exceptions with evidence citations. Missing budget
         is a blocker, never zero. Variance comes only from the pinned
-        ``boxscore::variance`` owner — bound by default as the ported
-        deterministic oracle (values pinned against the real Rust
-        functions); pass ``no_variance`` for the honest
+        Rust ``boxscore::exact::variance`` owner. The host must install
+        ``boxscore-exact`` and configure ``PLAT_BOXSCORE_EXACT_BIN`` when
+        it is not on PATH; otherwise variance returns BACKEND_UNAVAILABLE.
+        Pass ``no_variance`` for the explicit
         VARIANCE_NOT_IMPLEMENTED blocked status instead. Unspecified
         materiality and database default to the documented synthetic
         walkthrough policy/snapshot. Refuses wildcard or aggregate asset
