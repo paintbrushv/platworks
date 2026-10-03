@@ -7,7 +7,7 @@ All data in this package is public metadata about sibling repositories
 No deal, tenant, or portfolio data ships in this package.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.4"
 
 from platworks import catalog
 from platworks.catalog import (

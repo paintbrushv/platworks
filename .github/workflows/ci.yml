@@ -1,52 +1,123 @@
 name: CI
-
 on:
   push:
     branches: [main]
   pull_request:
-
+  workflow_call:
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
-  test:
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    env:
-      PLAT_BOXSCORE_EXACT_BIN: ${{ github.workspace }}/ops-producer/boxscore/target/debug/boxscore-exact
-      CARGO_BUILD_JOBS: 2
-      CARGO_PROFILE_DEV_DEBUG: 0
-    strategy:
-      matrix:
-        python-version: ["3.11", "3.12"]
+  build:
+    runs-on: ubuntu-22.04
+    outputs:
+      operations-sha: ${{ steps.sources.outputs.operations_sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.12'
+      - id: sources
+        run: |
+          python - <<'PY'
+          import json, os
+          sources = json.load(open('release-sources.json'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as stream:
+              stream.write('operations_sha=' + sources['plat-operations']['sha'] + '\n')
+          PY
+      - run: python scripts/release_gate.py
+      - run: pip install build twine ruff
+      - run: python scripts/build_components.py
+      - run: twine check dist/* wheelhouse/*
+      - run: ruff check src tests scripts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-wheels
+          path: wheelhouse/*.whl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+  native:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            manylinux: '2_28'
+          - os: macos-15-intel
+            target: x86_64-apple-darwin
+            manylinux: auto
+          - os: macos-15
+            target: aarch64-apple-darwin
+            manylinux: auto
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            manylinux: auto
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    env:
+      CARGO_BUILD_JOBS: 2
+      CARGO_INCREMENTAL: 0
+    steps:
       - uses: actions/checkout@v4
         with:
           repository: paintbrushv/plat-operations
-          ref: e0da058007df564c23668626a4a6e131d0068854
-          path: ops-producer
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+          ref: ${{ needs.build.outputs.operations-sha }}
+      - uses: PyO3/maturin-action@v1
         with:
-          workspaces: ops-producer/boxscore
-      - name: Build pinned exact-cent operating producer
-        run: cargo build --locked --manifest-path ops-producer/boxscore/Cargo.toml --bin boxscore-exact
-      - name: Install pinned financial-core backends
+          maturin-version: '1.15.0'
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux }}
+          args: --release --locked --out dist
+          sccache: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-${{ matrix.os }}
+          path: dist/*.whl
+          if-no-files-found: error
+  clean-install:
+    needs: [build, native]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-15-intel, macos-15, windows-2022]
+        python: ['3.11', '3.12']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-wheels
+          path: wheelhouse/
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-${{ matrix.os }}
+          path: wheelhouse/
+      - name: Catalog-only clean install
+        run: python scripts/clean_install.py --profile catalog --wheelhouse wheelhouse --output catalog-check.json
+      - name: Analysis clean install and financial/MCP workflows
+        run: python scripts/clean_install.py --profile analysis --wheelhouse wheelhouse --output analysis-check.json
+      - name: Full umbrella suite against installed packages
+        if: runner.os == 'Linux'
+        shell: bash
         run: |
-          pip install -e ".[dev]"
-          # Immutable implementation pins extend the recorded starting baseline.
-          # PyPI releases currently lag these reviewed producer commits.
-          pip install \
-            git+https://github.com/paintbrushv/plat-multifamily-underwriting.git@b42764be7d0bf278272ff29ce36e0c98e2c10f5f \
-            git+https://github.com/paintbrushv/plat-costmodel.git@518142ecb8771e52fcc9985237fe1a6f97a76168 \
-            git+https://github.com/paintbrushv/plat-harness.git@53015df7835cc7495e40c3a4e6116dfdf4c2e213
+          pip install --require-hashes --only-binary=:all: -r requirements-analysis.lock
+          pip install --no-deps wheelhouse/*.whl
+          pip install pytest
           pip check
-      - name: Verify catalog against recorded evidence
-        run: python scripts/verify_catalog.py
-      - name: Test (full suite, stdio e2e included)
-        run: pytest -q
-      - name: Lint
-        run: |
-          ruff check src tests scripts/verify_catalog.py
-          git diff --check
+          python scripts/verify_catalog.py
+          python -I -m pytest --require-installed-wheel -q
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: install-evidence-${{ matrix.os }}-${{ matrix.python }}
+          path: |
+            *-check.json
+            release-sources.json

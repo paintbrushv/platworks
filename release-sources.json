@@ -1,0 +1,18 @@
+{
+  "plat-multifamily-underwriting": {
+    "version": "0.1.2",
+    "sha": "96dade6530ef9032c1294e41afaeb7ac8da8f1ba"
+  },
+  "plat-costmodel": {
+    "version": "0.1.1",
+    "sha": "1f82087dc7db1715f44336467c50a92b16748903"
+  },
+  "plat-harness": {
+    "version": "0.1.1",
+    "sha": "a57acc496b1bc945d22c1db8bd1ea324fb8ef697"
+  },
+  "plat-operations": {
+    "version": "0.1.1",
+    "sha": "e2c3837fcdac9fdf24bf2b397c161bf01a9e94a1"
+  }
+}

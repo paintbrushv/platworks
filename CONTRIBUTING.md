@@ -25,6 +25,11 @@ pytest                    # full suite including stdio end-to-end tests
 
 Style: ruff (`line-length = 100`, `target-version = py311`); imports sorted.
 
+Tests import the installed package, including in subprocesses. The editable install
+above supports local development. Release CI installs built wheels and runs
+`python -I -m pytest --require-installed-wheel -q`; the guard rejects checkout or
+editable imports and records the imported package path in the log.
+
 ## Adding a component to the catalog
 
 1. Verify the repository is public and fetch its exact GitHub description and license

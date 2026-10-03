@@ -27,15 +27,27 @@ is separate from installation, financial acceptance, and assistant-host support.
 The [catalog evidence](docs/catalog-evidence.json) records verified metadata;
 [baseline status](docs/v0.1-baseline.md) lists the remaining release work.
 
-## Install
+## Install the packaging candidate
+
+The candidate is `platworks==0.1.4`; these versions have not been uploaded to PyPI.
+Use the reviewed wheel artifacts and [clean-install guide](docs/installation.md).
+The analysis profile pins underwriting 0.1.2 and costmodel, harness, and operations
+0.1.1. It includes the native `boxscore-exact` executable and MCP 2.3–2.x.
+
+With all candidate wheels in `wheelhouse/`:
 
 ```bash
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-pytest
+python -m venv .venv
+# Activate .venv for your shell, then:
+python -m pip install --only-binary=:all: --find-links wheelhouse 'platworks[analysis]==0.1.4'
+platworks doctor --analysis --json
+python -I -m platworks.verify_install
 ```
 
-Financial tools require their installed producers. See [financial-core setup and contracts](docs/financial-core.md), including the local Rust binary configuration.
+The hashed dependency locks and CI verification commands are in the install guide.
+A catalog-only install omits the `analysis` extra. `platworks doctor` checks that
+lighter profile. Financial tools require the analysis producers; see
+[financial contracts](docs/financial-core.md).
 
 ## The MCP server
 

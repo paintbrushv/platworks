@@ -1,14 +1,29 @@
-"""Test-path bootstrap: make the src/ layout importable without an install."""
+"""Test fixtures and an explicit installed-wheel acceptance guard."""
 
-import os
-import sys
+import json
+from importlib.metadata import distribution
+from pathlib import Path
 
 import pytest
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "src")
-if SRC not in sys.path:
-    sys.path.insert(0, SRC)
+
+def pytest_addoption(parser):
+    parser.addoption("--require-installed-wheel", action="store_true",
+                     help="Refuse tests importing platworks from checkout/editable source")
+
+
+def pytest_sessionstart(session):
+    if not session.config.getoption("--require-installed-wheel"):
+        return
+    import platworks
+
+    installed = distribution("platworks")
+    actual = Path(platworks.__file__).resolve()
+    expected = Path(installed.locate_file("platworks/__init__.py")).resolve()
+    direct_url = json.loads(installed.read_text("direct_url.json") or "{}")
+    if actual != expected or direct_url.get("dir_info", {}).get("editable"):
+        raise pytest.UsageError("Installed-wheel suite imported checkout/editable source")
+    print(f"Installed-wheel suite imports: {actual}")
 
 
 @pytest.fixture
