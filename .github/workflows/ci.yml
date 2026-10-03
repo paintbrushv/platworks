@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: paintbrushv/plat-operations
-          ref: c9226b2339af61817563e31962ea686b27deb3ba
+          ref: e0da058007df564c23668626a4a6e131d0068854
           path: ops-producer
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -38,9 +38,9 @@ jobs:
           # Immutable implementation pins extend the recorded starting baseline.
           # PyPI releases currently lag these reviewed producer commits.
           pip install \
-            git+https://github.com/paintbrushv/plat-multifamily-underwriting.git@a548b7810f25e296afedff5be94f2e9291701590 \
+            git+https://github.com/paintbrushv/plat-multifamily-underwriting.git@b42764be7d0bf278272ff29ce36e0c98e2c10f5f \
             git+https://github.com/paintbrushv/plat-costmodel.git@518142ecb8771e52fcc9985237fe1a6f97a76168 \
-            git+https://github.com/paintbrushv/plat-harness.git@ad64500a9f82d8d9ece67afcd3fb7dc6b5fda00e
+            git+https://github.com/paintbrushv/plat-harness.git@22b06778cebec91c9617e7776ec8b3760ad6fe00
           pip check
       - name: Verify catalog against recorded evidence
         run: python scripts/verify_catalog.py

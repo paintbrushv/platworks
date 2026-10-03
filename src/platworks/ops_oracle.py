@@ -86,7 +86,7 @@ def calculate(actuals, budgets):
         error = payload.get("error")
         code = error.get("code") if isinstance(error, dict) else None
         if code in {"INVALID_INPUT", "MONEY_PRECISION", "MONEY_OVERFLOW", "INPUT_LIMIT",
-                    "CONTRACT_MISMATCH", "EXCESS_PRECISION"}:
+                    "CONTRACT_MISMATCH", "EXCESS_PRECISION", "ACCOUNT_MAPPING_CONFLICT"}:
             _fail(code, "Operating producer refused the financial input.")
         _fail("PRODUCER_REFUSAL", "Operating producer refused the request.")
     if completed.returncode != 0 or payload.get("status") not in {"calculated", "review_required"}:
@@ -129,11 +129,11 @@ def variance_oracle(actuals, budgets):
 
 
 def compute_account_variances(actuals, budgets):
-    return calculate(actuals, budgets)["result"]["by_account"]
+    return variance_oracle(actuals, budgets)["by_account"]
 
 
 def compute_noi_bridge(actuals, budgets):
-    return calculate(actuals, budgets)["result"]["noi_bridge"]
+    return variance_oracle(actuals, budgets)["noi_bridge"]
 
 
 class BoundOracle:

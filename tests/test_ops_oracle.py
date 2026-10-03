@@ -167,9 +167,11 @@ def test_real_producer_preserves_cents_and_refuses_subcent_or_overflow():
 def test_bridge_cannot_drop_sign_review_flags():
     import pytest
 
-    with pytest.raises(ops_oracle.OpsProducerError) as exc:
-        ops_oracle.variance_oracle(_rows([("6000", "repairs", -1)]), [])
-    assert exc.value.code == "REVIEW_REQUIRED"
+    for helper in (ops_oracle.variance_oracle, ops_oracle.compute_account_variances,
+                   ops_oracle.compute_noi_bridge, ops_oracle.BoundOracle()):
+        with pytest.raises(ops_oracle.OpsProducerError) as exc:
+            helper(_rows([("6000", "repairs", -1)]), [])
+        assert exc.value.code == "REVIEW_REQUIRED"
 
 
 def test_missing_producer_and_wrong_pin_refuse(monkeypatch):
@@ -262,3 +264,17 @@ def test_exact_csv_to_persistence_correction_and_harness_review(tmp_path):
                     (second, "actual", 99, "4000", "Rent", "rental income", 1))
     refused = ops_review("synthetic_ops", "2026-05", db_path=str(database))
     assert refused["error"]["code"] == "INVALID_CONTRACT"
+
+
+def test_real_producer_matches_codes_and_preserves_mapping_failure():
+    import pytest
+
+    a = {"account_code": "4000", "account_name": "Actual rent", "category": "Rental Income",
+         "amount": "100.10"}
+    b = {**a, "account_name": "Budget rent", "category": " rental income ", "amount": "90.00"}
+    result = ops_oracle.variance_oracle([a], [b])
+    assert len(result["by_account"]) == 1
+    assert result["noi_bridge"]["noi_variance"] == "10.10"
+    with pytest.raises(ops_oracle.OpsProducerError) as exc:
+        ops_oracle.variance_oracle([a], [{**b, "category": "repairs"}])
+    assert exc.value.code == "ACCOUNT_MAPPING_CONFLICT"
