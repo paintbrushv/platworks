@@ -29,8 +29,6 @@ import sys
 
 import pytest
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 # ---------------------------------------------------------------------------
 # Synthetic ground-truth fixtures (schema-compliant engine canonical v0.1,
 # mirrored from plat-multifamily-underwriting tests/conftest.py
@@ -272,7 +270,7 @@ def test_product_tool_purposes_surface_in_descriptions():
         )
 
 
-def test_product_tools_are_importable_without_sibling_packages():
+def test_product_tools_are_importable_without_sibling_packages(tmp_path):
     """Importing wrappers must not require engine/costmodel/harness.
 
     The sibling services are imported lazily inside each tool call, so
@@ -291,10 +289,10 @@ def test_product_tools_are_importable_without_sibling_packages():
         "print('lazy-import-ok')\n"
     )
     env = dict(os.environ)
-    env["PYTHONPATH"] = os.path.join(REPO_ROOT, "src")
+    env.pop("PYTHONPATH", None)
     result = subprocess.run(
-        [sys.executable, "-B", "-c", probe],
-        capture_output=True, text=True, env=env, cwd="/tmp",
+        [sys.executable, "-I", "-B", "-c", probe],
+        capture_output=True, text=True, env=env, cwd=tmp_path,
     )
     assert result.returncode == 0, result.stderr
     assert "lazy-import-ok" in result.stdout
@@ -763,10 +761,8 @@ def test_stdio_end_to_end_ops_review_with_defaults():
             command=sys.executable,
             env={key: os.environ[key] for key in ("PLAT_BOXSCORE_EXACT_BIN",
                  "PLAT_BOXSCORE_EXACT_SHA256") if key in os.environ},
-            args=["-B", "-c",
-                  "import sys; sys.path.insert(0, %r); "
-                  "from platworks.mcp_server import main; main()"
-                  % os.path.join(REPO_ROOT, "src")],
+            args=["-I", "-B", "-c",
+                  "from platworks.mcp_server import main; main()"],
         )
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
@@ -809,10 +805,8 @@ def test_stdio_end_to_end_product_tools():
             command=sys.executable,
             env={key: os.environ[key] for key in ("PLAT_BOXSCORE_EXACT_BIN",
                  "PLAT_BOXSCORE_EXACT_SHA256") if key in os.environ},
-            args=["-B", "-c",
-                  "import sys; sys.path.insert(0, %r); "
-                  "from platworks.mcp_server import main; main()"
-                  % os.path.join(REPO_ROOT, "src")],
+            args=["-I", "-B", "-c",
+                  "from platworks.mcp_server import main; main()"],
         )
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:

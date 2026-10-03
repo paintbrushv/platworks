@@ -113,7 +113,7 @@ jobs:
           pip install pytest
           pip check
           python scripts/verify_catalog.py
-          pytest -q
+          python -I -m pytest --require-installed-wheel -q
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -244,18 +244,12 @@ def test_main_module_has_stdio_entrypoint():
 @pytest.mark.slow
 def test_stdio_end_to_end_roundtrip(tmp_path):
     """A real MCP stdio client must be able to drive the server."""
-    import os
-
     from mcp import ClientSession, StdioServerParameters
     from mcp.client.stdio import stdio_client
 
-    src = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
-    server_cmd = (
-        f"import sys; sys.path.insert(0, {src!r}); "
-        "from platworks.mcp_server import main; main()"
-    )
+    server_cmd = "from platworks.mcp_server import main; main()"
     params = StdioServerParameters(
-        command=sys.executable, args=["-B", "-c", server_cmd]
+        command=sys.executable, args=["-I", "-B", "-c", server_cmd], cwd=str(tmp_path)
     )
 
     async def scenario():

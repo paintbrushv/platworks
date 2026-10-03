@@ -23,7 +23,6 @@ import pytest
 from platworks import catalog
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-SRC = os.path.join(ROOT, "src")
 
 README = os.path.join(ROOT, "README.md")
 CONTRIBUTING = os.path.join(ROOT, "CONTRIBUTING.md")
@@ -91,9 +90,8 @@ def test_readme_quickstart_commands_exist_in_cli():
 
 def _run(args, cwd, timeout=120):
     env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
-    env["PYTHONPATH"] = SRC
     return subprocess.run(
-        [sys.executable, "-B"] + args,
+        [sys.executable, "-I", "-B"] + args,
         cwd=cwd, capture_output=True, text=True, env=env, timeout=timeout,
     )
 

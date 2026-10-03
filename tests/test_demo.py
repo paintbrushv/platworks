@@ -17,8 +17,6 @@ import pytest
 
 from platworks import catalog, demo
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 
 def test_write_demo_creates_expected_files(tmp_path):
     out = demo.write_demo(str(tmp_path / "demo"))
@@ -83,9 +81,8 @@ def test_demo_script_runs_end_to_end_over_stdio(tmp_path):
         k: v for k, v in os.environ.items()
         if k not in ("PYTHONPATH", "PLAT_DEMO_DIR")
     }
-    env["PYTHONPATH"] = os.path.join(ROOT, "src")
     result = subprocess.run(
-        [sys.executable, "-B", os.path.join(out, "run_demo.py")],
+        [sys.executable, "-I", "-B", os.path.join(out, "run_demo.py")],
         cwd=out,  # run from the demo dir, not the repo
         capture_output=True, text=True, env=env, timeout=120,
     )
