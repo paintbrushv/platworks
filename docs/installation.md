@@ -89,10 +89,13 @@ probe contains no source-tree fallback. CI runs both profiles on all eight
 platform/Python combinations and the full umbrella suite on Linux.
 
 To refresh locks after reviewing dependency changes, use `uv pip compile
-pyproject.toml --universal --generate-hashes --no-header` for the catalog. Add
+pyproject.toml --python-version 3.11 --universal --only-binary :all:
+--constraint constraints-wheels.txt --generate-hashes --no-header` for the catalog. Add
 `--extra analysis --find-links wheelhouse` and `--no-emit-package` for each of
 `platworks`, `plat-multifamily-underwriting`, `plat-costmodel`, `plat-harness`, and
-`plat-operations` for the analysis lock. Re-run the full clean-install matrix.
+`plat-operations` for the analysis lock. The Python floor is required: universal platform resolution alone does not
+set the minimum Python version. The constraints retain a compatible prebuilt
+cryptography wheel on Intel macOS. Re-run the full clean-install matrix.
 
 A release tag must equal the metadata version, use an unused PyPI version, and
 pass CI before the workflow can upload the same tested artifacts. Publication
