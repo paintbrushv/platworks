@@ -1,30 +1,9 @@
-"""Tests for the ported ``boxscore::variance`` ops owner (platworks.ops_oracle).
-
-The ops-review seam (``plat_harness.adapters.ops_review``) implements no
-variance arithmetic: numbers come only through a host-bound oracle pinned
-to ``boxscore::variance`` — the pure Rust functions in
-``plat-operations/boxscore/src/variance.rs``. ``platworks.ops_oracle`` is
-that owner, ported verbatim, so the MCP server can bind the pinned oracle
-by default (an MCP stdio client can never pass a callable across the wire).
-
-These tests pin the port against two independent ground truths:
-
-1. **Rust-expected values.** The constants below are the actual output of
-   the real Rust ``compute_account_variances`` + ``compute_noi_bridge``
-   executed over the synthetic walkthrough snapshot's 2026-04 GL rows
-   (via ``boxscore/examples/ops_oracle_expected.rs``, same crate, same
-   functions the frozen owner exports). Drift between the port and the
-   Rust owner fails here rather than fabricating numbers.
-2. **The frozen harness oracle contract.** The same pinned values the
-   harness's own suite asserts for the stub oracle over identical seeded
-   rows (``test_ops_review.py``:
-   ``noi_variance == '499.50'``, ``actual_noi == '3799.50'``).
-"""
+"""Financial expectations executed against the real Rust exact-cent producer."""
 
 from platworks import ops_oracle
 
 # ------------------------------------------------- Rust-expected ground truth
-# Actual output of the real Rust boxscore::variance owner functions
+# Actual output of the real Rust boxscore::exact::variance owner functions
 # (plat-operations/boxscore/src/variance.rs) over the synthetic walkthrough
 # snapshot rows for 2026-04:
 #   gl_actuals: 4000 Rental Income 5000.0; 6100 Repairs & Maintenance 1200.5
@@ -70,9 +49,9 @@ SNAPSHOT_BUDGETS = [
 
 
 def test_oracle_pins_the_boxscore_owner_label():
-    assert ops_oracle.ORACLE_OWNER == "boxscore::variance"
+    assert ops_oracle.ORACLE_OWNER == "boxscore::exact::variance"
     assert ops_oracle.ORACLE_FUNCTIONS == (
-        "compute_account_variances", "compute_noi_bridge")
+        "compute",)
     assert ops_oracle.ORACLE_ROW_KEYS == frozenset(
         {"account_code", "account_name", "category", "amount"})
 
@@ -154,10 +133,6 @@ def test_classification_is_trim_and_lowercase_like_the_rust_ontology():
     budgets = _rows([("4000", "Rental Income", 90.0)])
     bridge = ops_oracle.compute_noi_bridge(actuals, budgets)
     assert bridge["actual_revenue"] == "100.00"
-    assert ops_oracle._classify("  Rental Income ") == "revenue"
-    assert ops_oracle._classify("BAD DEBT") == "revenue"
-    assert ops_oracle._classify("Payroll") == "expense"
-    assert ops_oracle._classify("Unmapped") == "unmapped"
 
 
 def test_duplicate_rows_sum_like_the_rust_btreemap_totals():
@@ -169,3 +144,121 @@ def test_duplicate_rows_sum_like_the_rust_btreemap_totals():
     first = next(r for r in rows if r["account_code"] == "4000")
     assert first["actual"] == "10000.00"
     assert first["variance"] == "5600.00"
+
+
+def test_real_producer_preserves_cents_and_refuses_subcent_or_overflow():
+    import pytest
+
+    actuals = _rows([("4000", "rental income", 0.10)])
+    actuals.append({**actuals[0], "amount": "0.20"})
+    payload = ops_oracle.calculate(actuals, [])
+    assert payload["result"]["noi_bridge"]["actual_noi"] == "0.30"
+    assert payload["producer"]["arithmetic"] == "checked_i64_cents"
+    assert len(payload["producer"]["binary_sha256"]) == 64
+    for value in ("0.001", 0.01, "NaN", "92233720368547758.08"):
+        with pytest.raises(ops_oracle.OpsProducerError):
+            ops_oracle.calculate([{**actuals[0], "amount": value}], [])
+    with pytest.raises(ops_oracle.OpsProducerError) as exc:
+        ops_oracle.calculate([{**actuals[0], "amount": "92233720368547758.07"},
+                              {**actuals[0], "amount": "0.01"}], [])
+    assert exc.value.code == "MONEY_OVERFLOW"
+
+
+def test_bridge_cannot_drop_sign_review_flags():
+    import pytest
+
+    with pytest.raises(ops_oracle.OpsProducerError) as exc:
+        ops_oracle.variance_oracle(_rows([("6000", "repairs", -1)]), [])
+    assert exc.value.code == "REVIEW_REQUIRED"
+
+
+def test_missing_producer_and_wrong_pin_refuse(monkeypatch):
+    import pytest
+
+    monkeypatch.setenv("PLAT_BOXSCORE_EXACT_SHA256", "0" * 64)
+    with pytest.raises(ops_oracle.OpsProducerError) as exc:
+        ops_oracle.calculate([], [])
+    assert exc.value.code == "PRODUCER_MISMATCH"
+    monkeypatch.setenv("PLAT_BOXSCORE_EXACT_BIN", "/missing/boxscore-exact")
+    with pytest.raises(ops_oracle.OpsProducerError) as exc:
+        ops_oracle.calculate([], [])
+    assert exc.value.code == "BACKEND_UNAVAILABLE"
+
+
+def test_fixed_arguments_timeout_and_invalid_responses(monkeypatch):
+    import subprocess
+    from types import SimpleNamespace
+
+    import pytest
+
+    def timeout(args, **kwargs):
+        assert len(args) == 2 and args[1] == "protocol"
+        assert kwargs["timeout"] == 60
+        assert "shell" not in kwargs
+        raise subprocess.TimeoutExpired(args, 60)
+
+    monkeypatch.setattr(ops_oracle.subprocess, "run", timeout)
+    with pytest.raises(ops_oracle.OpsProducerError) as exc:
+        ops_oracle.calculate([], [])
+    assert exc.value.code == "PRODUCER_TIMEOUT"
+    for body in (b"not JSON", b"[]", b'{"contract_version":"plat.ops/0"}',
+                 b'{"contract_version":"plat.ops/1","status":"calculated"}'):
+        monkeypatch.setattr(ops_oracle.subprocess, "run", lambda *a, **k:
+                            SimpleNamespace(returncode=0, stdout=body))
+        with pytest.raises(ops_oracle.OpsProducerError) as exc:
+            ops_oracle.calculate([], [])
+        assert exc.value.code == "INVALID_CONTRACT"
+
+
+def test_exact_csv_to_persistence_correction_and_harness_review(tmp_path):
+    import json
+    import os
+    import sqlite3
+    import subprocess
+
+    from platworks.wrappers import ops_review
+
+    binary = os.environ["PLAT_BOXSCORE_EXACT_BIN"]
+    database = tmp_path / "exact.sqlite"
+
+    def cli(*args):
+        proc = subprocess.run([binary, *map(str, args)], capture_output=True,
+                              text=True, timeout=30, check=True)
+        return json.loads(proc.stdout)
+
+    actuals, budgets = tmp_path / "actual.csv", tmp_path / "budget.csv"
+    header = "account_code,account_name,category,amount\n"
+    actuals.write_text(header + "4000,Rent,rental income,0.10\n4000,Rent,rental income,0.20\n")
+    budgets.write_text(header + "4000,Rent,rental income,0.10\n")
+    cli("init", "--database", database)
+    first = cli("import-csv", "--database", database, "--actuals", actuals,
+                "--budgets", budgets, "--property", "synthetic_ops", "--period",
+                "2026-05", "--units", "10")["revision_id"]
+    issued = cli("issue", "--database", database, "--revision", first)
+    assert issued["variance"]["noi_bridge"]["noi_variance"] == "0.20"
+    with sqlite3.connect(database) as con:
+        original = con.execute("SELECT body FROM exact_reports").fetchone()[0]
+        assert con.execute("SELECT sum(amount_cents) FROM exact_gl WHERE kind='actual'")\
+            .fetchone()[0] == 30
+    actuals.write_text(header + "4000,Rent,rental income,0.31\n")
+    second = cli("import-csv", "--database", database, "--actuals", actuals,
+                 "--budgets", budgets, "--property", "synthetic_ops", "--period",
+                 "2026-05", "--units", "10", "--supersedes", first,
+                 "--reason", "Synthetic one-cent correction")["revision_id"]
+    corrected = cli("issue", "--database", database, "--revision", second)
+    assert corrected["changes"]["actual_noi"] == "0.01"
+    with sqlite3.connect(database) as con:
+        assert con.execute("SELECT body FROM exact_reports WHERE id=?", (issued["report_id"],))\
+            .fetchone()[0] == original
+    payload = ops_review("synthetic_ops", "2026-05", db_path=str(database))
+    assert "error" not in payload, payload
+    assert payload["contract_version"] == "ops-review/2.0.0"
+    assert payload["variance"]["noi_bridge"]["actual_noi"]["amount"] == "0.31"
+    assert payload["provenance"]["operating_producer"]["arithmetic"] == "checked_i64_cents"
+    assert any(e["code"] == "UNREVIEWED_ACCOUNT_MAPPING" for e in payload["exceptions"])
+
+    with sqlite3.connect(database) as con:
+        con.execute("INSERT INTO exact_gl VALUES (?,?,?,?,?,?,?)",
+                    (second, "actual", 99, "4000", "Rent", "rental income", 1))
+    refused = ops_review("synthetic_ops", "2026-05", db_path=str(database))
+    assert refused["error"]["code"] == "INVALID_CONTRACT"

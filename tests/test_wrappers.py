@@ -336,9 +336,9 @@ def test_backsolve_finds_price_meeting_target_coc():
     args = {
         "inputs": SYNTHETIC_CANONICAL,
         "target_coc_pct": 7.0,
-        "year_built": 1984,
-        "benchmark_5yr_treasury_pct": 3.91,
-        "agency_spread_pct": 1.5,
+        "policy": {"version": "plat.backsolve-policy/1", "strategy": "cashflow",
+                   "year_built": 1984},
+        "benchmark": {"rate": "0.0391", "as_of": "2026-10-03", "source": "synthetic:test"},
         "max_iterations": 14,
     }
     payload = _assert_no_error(_call("underwrite_backsolve", args))
@@ -356,7 +356,9 @@ def test_backsolve_missing_tax_policy_is_typed_refusal():
     inputs = json.loads(json.dumps(SYNTHETIC_CANONICAL))
     del inputs["metadata"]["property_summary"]["property_tax_policy"]
     _assert_error(
-        _call("underwrite_backsolve", {"inputs": inputs, "target_coc_pct": 7.0}),
+        _call("underwrite_backsolve", {"inputs": inputs, "target_coc_pct": 7.0,
+              "policy": {"version": "plat.backsolve-policy/1", "strategy": "cashflow"},
+              "benchmark": {"rate": "0.04", "as_of": "2026-10-03", "source": "synthetic:test"}}),
         "ENGINE_REFUSAL",
     )
 
@@ -367,6 +369,43 @@ def test_backsolve_invalid_target_coc_is_typed_refusal():
               {"inputs": SYNTHETIC_CANONICAL, "target_coc_pct": 0}),
         "INVALID_INPUT",
     )
+
+
+def test_backsolve_requires_explicit_benchmark_and_policy():
+    _assert_error(_call("underwrite_backsolve", {
+        "inputs": SYNTHETIC_CANONICAL, "target_coc_pct": 7.0,
+    }), "INVALID_INPUT")
+
+
+def test_backsolve_mcp_and_cli_match_public_engine_api(tmp_path):
+    import subprocess
+    import sys
+
+    from engine.backsolve import backsolve_price
+
+    policy = {"version": "plat.backsolve-policy/1", "strategy": "cashflow", "year_built": 1984}
+    benchmark = {"rate": "0.0391", "as_of": "2026-10-03", "source": "synthetic:test"}
+    direct = backsolve_price(SYNTHETIC_CANONICAL, target_coc="0.07", policy=policy,
+                            benchmark=benchmark)
+    assert direct["status"] == "converged"
+    payload = _assert_no_error(_call("underwrite_backsolve", {
+        "inputs": SYNTHETIC_CANONICAL, "target_coc_pct": 7,
+        "policy": policy, "benchmark": benchmark,
+    }))
+    assert payload["summary"] == direct["summary"]
+    assert payload["case"] == direct["case"]
+    source = tmp_path / "synthetic.json"
+    source.write_text(json.dumps(SYNTHETIC_CANONICAL))
+    completed = subprocess.run([
+        sys.executable, "-I", "-m", "engine.backsolve", "--canonical-json", str(source),
+        "--output-dir", str(tmp_path / "result"), "--policy-version", policy["version"],
+        "--year-built", "1984", "--benchmark-5yr-treasury", benchmark["rate"],
+        "--benchmark-as-of", benchmark["as_of"], "--benchmark-source", benchmark["source"],
+    ], capture_output=True, text=True, timeout=90)
+    assert completed.returncode == 0, completed.stderr
+    summary = json.loads((tmp_path / "result/backsolve_summary.json").read_text())
+    summary.pop("artifacts")
+    assert summary == direct["summary"]
 
 
 # --------------------------------------------------------- tax_regime_lookup
@@ -566,15 +605,15 @@ def test_ops_review_over_synthetic_snapshot():
     assert payload["period"] == "2026-04"
     assert payload["scope"]["properties_reviewed"] == 1
     assert payload["scope"]["periods_reviewed"] == 1
-    # the pinned boxscore::variance owner is bound by default, so the
+    # the pinned boxscore::exact::variance owner is bound by default, so the
     # review reports real variance numbers (pinned against the real Rust
     # functions in tests/test_ops_oracle.py), never fabricated ones
     assert payload["status"] == "reviewed"
     prov = payload["provenance"]
     assert prov["service"] == "plat-harness"
     assert prov["entrypoint"] == "plat_harness.adapters.ops_review.review_period"
-    assert prov["contract_version"] == "ops-review/1.0.0"
-    assert prov["variance_oracle_owner"] == "boxscore::variance"
+    assert prov["contract_version"] == "ops-review/2.0.0"
+    assert prov["variance_oracle_owner"] == "boxscore::exact::variance"
 
 
 def test_ops_review_no_variance_is_an_honest_blocked_review():
@@ -596,7 +635,7 @@ def test_ops_review_no_variance_is_an_honest_blocked_review():
 
 
 def test_ops_review_with_oracle_bound_reports_variance():
-    """When the caller binds the pinned boxscore::variance oracle, the
+    """When the caller binds the pinned boxscore::exact::variance oracle, the
     review reports real variance numbers (still verbatim from the seam)."""
     import decimal
 
@@ -650,7 +689,7 @@ def test_ops_review_with_oracle_bound_reports_variance():
     assert payload["status"] == "reviewed"
     variance = payload["variance"]
     assert variance["noi_bridge"]["actual_noi"]
-    assert variance["oracle_owner"] == "boxscore::variance"
+    assert variance["oracle_owner"] == "boxscore::exact::variance"
 
 
 def test_ops_review_defaults_work_without_materiality_db_or_callable():
@@ -659,7 +698,7 @@ def test_ops_review_defaults_work_without_materiality_db_or_callable():
 
     Unspecified materiality and database default to the documented
     synthetic walkthrough policy/snapshot; the pinned
-    boxscore::variance oracle is bound by default, so the review reports
+    boxscore::exact::variance oracle is bound by default, so the review reports
     the Rust-expected variance numbers."""
     payload = _assert_no_error(_call("ops_review", {
         "asset_id": "synthetic_ops",
@@ -667,7 +706,7 @@ def test_ops_review_defaults_work_without_materiality_db_or_callable():
     }))
     assert payload["status"] == "reviewed"
     assert payload["variance"]["status"] == "provided"
-    assert payload["variance"]["oracle_owner"] == "boxscore::variance"
+    assert payload["variance"]["oracle_owner"] == "boxscore::exact::variance"
     # Rust-expected values (see tests/test_ops_oracle.py)
     assert payload["variance"]["noi_bridge"]["noi_variance"]["amount"] == "499.50"
     assert payload["variance"]["noi_bridge"]["actual_noi"]["amount"] == "3799.50"
@@ -728,6 +767,8 @@ def test_stdio_end_to_end_ops_review_with_defaults():
     async def scenario():
         params = StdioServerParameters(
             command=sys.executable,
+            env={key: os.environ[key] for key in ("PLAT_BOXSCORE_EXACT_BIN",
+                 "PLAT_BOXSCORE_EXACT_SHA256") if key in os.environ},
             args=["-B", "-c",
                   "import sys; sys.path.insert(0, %r); "
                   "from platworks.mcp_server import main; main()"
@@ -745,8 +786,8 @@ def test_stdio_end_to_end_ops_review_with_defaults():
                 assert data["status"] == "reviewed"
                 variance = data["variance"]
                 assert variance["status"] == "provided"
-                assert variance["oracle_owner"] == "boxscore::variance"
-                # Rust-expected values: the real boxscore::variance owner
+                assert variance["oracle_owner"] == "boxscore::exact::variance"
+                # Rust-expected values: the real boxscore::exact::variance owner
                 # functions over the same snapshot rows (pinned in
                 # tests/test_ops_oracle.py).
                 assert variance["noi_bridge"]["noi_variance"][
@@ -772,6 +813,8 @@ def test_stdio_end_to_end_product_tools():
     async def scenario():
         params = StdioServerParameters(
             command=sys.executable,
+            env={key: os.environ[key] for key in ("PLAT_BOXSCORE_EXACT_BIN",
+                 "PLAT_BOXSCORE_EXACT_SHA256") if key in os.environ},
             args=["-B", "-c",
                   "import sys; sys.path.insert(0, %r); "
                   "from platworks.mcp_server import main; main()"
@@ -792,6 +835,18 @@ def test_stdio_end_to_end_product_tools():
                 data = json.loads(res.content[0].text)
                 assert "error" not in data
                 assert data["metrics"]["noi"]["year_1_noi"] == pytest.approx(1050154.8)
+
+                from engine.backsolve import backsolve_price
+
+                policy = {"version": "plat.backsolve-policy/1", "strategy": "cashflow"}
+                benchmark = {"rate": "0.04", "as_of": "2026-10-03", "source": "synthetic:test"}
+                direct = backsolve_price(SYNTHETIC_CANONICAL, target_coc="0.07",
+                                        policy=policy, benchmark=benchmark)
+                res = await session.call_tool("underwrite_backsolve", {
+                    "inputs": SYNTHETIC_CANONICAL, "target_coc_pct": 7,
+                    "policy": policy, "benchmark": benchmark})
+                data = json.loads(res.content[0].text)
+                assert data["summary"] == direct["summary"]
 
                 res = await session.call_tool("tax_regime_lookup", FL_TAX_INPUTS)
                 data = json.loads(res.content[0].text)
