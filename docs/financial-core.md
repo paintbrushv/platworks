@@ -20,7 +20,9 @@ See the producer's [API contract](https://github.com/paintbrushv/plat-multifamil
 
 The former independent Python implementation has been removed.
 `platworks.ops_oracle` now invokes `boxscore-exact protocol` with a 60-second
-timeout. It validates `plat.ops/1`, decimal money, the input hash, and producer
+timeout. Each output pipe is limited to 16 MiB while reading; excess stdout
+or stderr terminates the child without buffering further output. It validates
+`plat.ops/1`, decimal money, the input hash, and producer
 identity. Missing binaries, timeouts, invalid precision, overflow, and
 unsupported contracts produce typed failures. The host controls the executable;
 MCP clients cannot supply executable paths or arguments.

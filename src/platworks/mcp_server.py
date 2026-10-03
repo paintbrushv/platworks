@@ -434,9 +434,10 @@ def build_server():
         The harness review reports occupancy change, feed freshness, and
         typed material exceptions with evidence citations. Missing budget
         is a blocker, never zero. Variance comes only from the pinned
-        ``boxscore::variance`` owner — bound by default as the ported
-        deterministic oracle (values pinned against the real Rust
-        functions); pass ``no_variance`` for the honest
+        Rust ``boxscore::exact::variance`` owner. The host must install
+        ``boxscore-exact`` and configure ``PLAT_BOXSCORE_EXACT_BIN`` when
+        it is not on PATH; otherwise variance returns BACKEND_UNAVAILABLE.
+        Pass ``no_variance`` for the explicit
         VARIANCE_NOT_IMPLEMENTED blocked status instead. Unspecified
         materiality and database default to the documented synthetic
         walkthrough policy/snapshot. Refuses wildcard or aggregate asset

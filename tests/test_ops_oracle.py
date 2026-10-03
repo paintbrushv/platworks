@@ -193,23 +193,74 @@ def test_fixed_arguments_timeout_and_invalid_responses(monkeypatch):
 
     import pytest
 
-    def timeout(args, **kwargs):
+    def timeout(args, request, **kwargs):
         assert len(args) == 2 and args[1] == "protocol"
         assert kwargs["timeout"] == 60
         assert "shell" not in kwargs
         raise subprocess.TimeoutExpired(args, 60)
 
-    monkeypatch.setattr(ops_oracle.subprocess, "run", timeout)
+    monkeypatch.setattr(ops_oracle, "_run_bounded", timeout)
     with pytest.raises(ops_oracle.OpsProducerError) as exc:
         ops_oracle.calculate([], [])
     assert exc.value.code == "PRODUCER_TIMEOUT"
     for body in (b"not JSON", b"[]", b'{"contract_version":"plat.ops/0"}',
                  b'{"contract_version":"plat.ops/1","status":"calculated"}'):
-        monkeypatch.setattr(ops_oracle.subprocess, "run", lambda *a, **k:
+        monkeypatch.setattr(ops_oracle, "_run_bounded", lambda *a, **k:
                             SimpleNamespace(returncode=0, stdout=body))
         with pytest.raises(ops_oracle.OpsProducerError) as exc:
             ops_oracle.calculate([], [])
         assert exc.value.code == "INVALID_CONTRACT"
+
+
+def test_streaming_limits_terminate_noisy_producer_on_either_pipe(monkeypatch):
+    import subprocess
+    import sys
+
+    import pytest
+
+    children = []
+    popen = subprocess.Popen
+
+    def launch(*args, **kwargs):
+        child = popen(*args, **kwargs)
+        children.append(child)
+        return child
+
+    monkeypatch.setattr(ops_oracle.subprocess, "Popen", launch)
+    monkeypatch.setattr(ops_oracle, "MAX_RESPONSE_BYTES", 65536)
+    for descriptor in (1, 2):
+        script = f"import os\nwhile True: os.write({descriptor}, b'x' * 8192)"
+        with pytest.raises(ops_oracle.OpsProducerError) as exc:
+            ops_oracle._run_bounded([sys.executable, "-c", script], b"{}", timeout=5)
+        assert exc.value.code == "INVALID_CONTRACT"
+        assert children[-1].poll() is not None
+
+
+def test_streaming_drains_both_pipes_and_enforces_deadline():
+    import subprocess
+    import sys
+
+    import pytest
+
+    # Both streams exceed pipe capacity; neither may block the other.
+    script = ("import os,sys; body=sys.stdin.buffer.read(); "
+              "os.write(2, b'e' * 200000); os.write(1, body)")
+    request = b"x" * 200000
+    result = ops_oracle._run_bounded([sys.executable, "-c", script], request, timeout=5)
+    assert result.returncode == 0 and result.stdout == request
+    with pytest.raises(subprocess.TimeoutExpired):
+        ops_oracle._run_bounded([sys.executable, "-c", "import time; time.sleep(10)"],
+                                b"{}", timeout=0.1)
+
+
+def test_producer_refuses_subtraction_outside_reversible_money_range():
+    import pytest
+
+    actual = {"account_code": "4000", "account_name": "Rent", "category": "rental income",
+              "amount": "-92233720368547758.07"}
+    with pytest.raises(ops_oracle.OpsProducerError) as exc:
+        ops_oracle.calculate([actual], [{**actual, "amount": "0.01"}])
+    assert exc.value.code == "MONEY_OVERFLOW"
 
 
 def test_exact_csv_to_persistence_correction_and_harness_review(tmp_path):

@@ -11,6 +11,9 @@ import os
 import re
 import shutil
 import subprocess
+import tempfile
+import threading
+import time
 from pathlib import Path
 
 CONTRACT_VERSION = "plat.ops/1"
@@ -24,6 +27,7 @@ NOI_BRIDGE_KEYS = frozenset({"actual_revenue", "budget_revenue", "revenue_varian
                             "actual_noi", "budget_noi", "noi_variance",
                             "unmapped_actual", "unmapped_budget"})
 MAX_REQUEST_BYTES = 2 * 1024 * 1024
+MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 TIMEOUT_SECONDS = 60
 _MONEY = re.compile(r"-?(0|[1-9][0-9]{0,16})\.[0-9]{2}\Z")
 
@@ -44,6 +48,54 @@ def _money(value):
     # Validate the integer boundary; this performs no financial calculation.
     if abs(int(value.replace(".", ""))) > 9223372036854775807:
         _fail("INVALID_CONTRACT", "Operating producer exceeded the cent range.")
+
+
+def _run_bounded(args, request, *, timeout):
+    """Drain both pipes with bounded memory and terminate on excess output."""
+    deadline = time.monotonic() + timeout
+    output = bytearray()
+    failed = threading.Event()
+    # A private, automatically removed input file avoids blocking on stdin
+    # while a malfunctioning producer fills one of its output pipes.
+    with tempfile.TemporaryFile() as source:
+        source.write(request)
+        source.seek(0)
+        with subprocess.Popen(args, stdin=source, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE, bufsize=0) as process:
+            def drain(stream, retain):
+                total = 0
+                try:
+                    while chunk := stream.read(65536):
+                        total += len(chunk)
+                        if total > MAX_RESPONSE_BYTES:
+                            failed.set()
+                            return
+                        if retain:
+                            output.extend(chunk)
+                except (OSError, ValueError):
+                    failed.set()
+
+            readers = [threading.Thread(target=drain, args=(stream, retain), daemon=True)
+                       for stream, retain in ((process.stdout, True), (process.stderr, False))]
+            for reader in readers:
+                reader.start()
+            try:
+                while True:
+                    if failed.is_set():
+                        _fail("INVALID_CONTRACT", "Operating producer output exceeded its "
+                              "limit or could not be read.")
+                    if process.poll() is not None and not any(r.is_alive() for r in readers):
+                        return subprocess.CompletedProcess(args, process.returncode, bytes(output))
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise subprocess.TimeoutExpired(args, timeout)
+                    failed.wait(min(remaining, 0.01))
+            finally:
+                if process.poll() is None:
+                    process.kill()
+                process.wait()
+                for reader in readers:
+                    reader.join(timeout=1)
 
 
 def calculate(actuals, budgets):
@@ -68,14 +120,11 @@ def calculate(actuals, budgets):
     if len(request) > MAX_REQUEST_BYTES:
         _fail("INPUT_LIMIT", "Operating request exceeds 2 MiB.")
     try:
-        completed = subprocess.run([str(path), "protocol"], input=request,
-                                   capture_output=True, timeout=TIMEOUT_SECONDS, check=False)
+        completed = _run_bounded([str(path), "protocol"], request, timeout=TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         _fail("PRODUCER_TIMEOUT", "Operating producer exceeded its time limit.")
     except OSError:
         _fail("BACKEND_UNAVAILABLE", "Cannot execute the configured operating producer.")
-    if len(completed.stdout) > 8 * MAX_REQUEST_BYTES:
-        _fail("INVALID_CONTRACT", "Operating producer exceeded its response limit.")
     try:
         payload = json.loads(completed.stdout)
     except (ValueError, UnicodeError):
