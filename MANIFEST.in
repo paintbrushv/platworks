@@ -1,3 +1,3 @@
-include requirements-*.lock constraints-wheels.txt release-sources.json
+include requirements-*.lock release-sources.json
 recursive-include scripts *.py
 recursive-include docs *.md

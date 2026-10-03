@@ -19,6 +19,8 @@ dependencies = [
     "anyio>=4.0",
     "click>=8.0",
     "packaging>=24,<27",
+    # Keep the standard catalog/analysis install on prebuilt Intel macOS wheels.
+    "cryptography>=48,<49; sys_platform == 'darwin' and platform_machine == 'x86_64'",
 ]
 
 [project.optional-dependencies]

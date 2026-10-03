@@ -63,6 +63,20 @@ def verify(wheelhouse, profile):
                 raise RuntimeError(f"Installation check failed ({result.returncode})")
             return result.stdout
 
+        # Verify the documented ordinary extra can resolve without compilers,
+        # then install the reviewed hashed set for runtime acceptance.
+        project = "platworks[analysis]" if profile == "analysis" else "platworks"
+        run(
+            "-m",
+            "pip",
+            "install",
+            "--dry-run",
+            "--ignore-installed",
+            "--only-binary=:all:",
+            "--find-links",
+            wheelhouse,
+            f"{project}=={VERSIONS['platworks']}",
+        )
         run("-m", "pip", "install", "--require-hashes", "--only-binary=:all:", "-r", lock)
         run("-m", "pip", "install", "--no-deps", *wheels)
         run("-m", "pip", "check")
@@ -93,6 +107,7 @@ def verify(wheelhouse, profile):
         installed = json.loads(run("-m", "pip", "list", "--format=json"))
     return {
         "status": "passed",
+        "ordinary_installer_resolves_with_wheels": True,
         "profile": profile,
         "python": platform.python_version(),
         "platform": f"{sys.platform}-{platform.machine().lower()}",

@@ -39,7 +39,7 @@ With all candidate wheels in `wheelhouse/`:
 ```bash
 python -m venv .venv
 # Activate .venv for your shell, then:
-python -m pip install --find-links wheelhouse 'platworks[analysis]==0.1.4'
+python -m pip install --only-binary=:all: --find-links wheelhouse 'platworks[analysis]==0.1.4'
 platworks doctor --analysis --json
 python -I -m platworks.verify_install
 ```

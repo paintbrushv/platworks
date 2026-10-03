@@ -1,3 +1,0 @@
-# Cryptography 50.0.2 has no compatible Intel macOS 15 wheel. The 48.x line
-# supplies that target. Other targets retain their current compatible version.
-cryptography<49; sys_platform == 'darwin' and platform_machine == 'x86_64'

@@ -31,7 +31,7 @@ native wheel and the four pure Python wheels in `wheelhouse/`.
 For an ordinary candidate install in an activated fresh environment:
 
 ```bash
-python -m pip install --find-links wheelhouse 'platworks[analysis]==0.1.4'
+python -m pip install --only-binary=:all: --find-links wheelhouse 'platworks[analysis]==0.1.4'
 python -m pip check
 platworks doctor --analysis --json
 python -I -m platworks.verify_install
@@ -90,12 +90,12 @@ platform/Python combinations and the full umbrella suite on Linux.
 
 To refresh locks after reviewing dependency changes, use `uv pip compile
 pyproject.toml --python-version 3.11 --universal --only-binary :all:
---constraint constraints-wheels.txt --generate-hashes --no-header` for the catalog. Add
+--generate-hashes --no-header` for the catalog. Add
 `--extra analysis --find-links wheelhouse` and `--no-emit-package` for each of
 `platworks`, `plat-multifamily-underwriting`, `plat-costmodel`, `plat-harness`, and
 `plat-operations` for the analysis lock. The Python floor is required: universal platform resolution alone does not
-set the minimum Python version. The constraints retain a compatible prebuilt
-cryptography wheel on Intel macOS. Re-run the full clean-install matrix.
+set the minimum Python version. Package metadata bounds cryptography to the compatible wheel line on Intel
+macOS, so ordinary installs also avoid a local Rust build. Re-run the full clean-install matrix.
 
 A release tag must equal the metadata version, use an unused PyPI version, and
 pass CI before the workflow can upload the same tested artifacts. Publication
