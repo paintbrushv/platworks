@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "platworks"
-version = "0.1.3"
+version = "0.1.4"
 description = "Umbrella package and MCP server for the plat commercial-real-estate ecosystem."
 readme = "README.md"
 license = { text = "Apache-2.0" }
@@ -15,12 +15,19 @@ classifiers = [
     "Topic :: Office/Business :: Financial :: Investment",
 ]
 dependencies = [
-    "mcp>=2.0",
+    "mcp>=2.3,<3",
     "anyio>=4.0",
     "click>=8.0",
+    "packaging>=24,<27",
 ]
 
 [project.optional-dependencies]
+analysis = [
+    "plat-multifamily-underwriting[mcp]==0.1.2",
+    "plat-costmodel[server]==0.1.1",
+    "plat-harness[ingest,pdf]==0.1.1",
+    "plat-operations==0.1.1",
+]
 dev = [
     "pytest>=8.0",
     "ruff>=0.1.0",
@@ -32,6 +39,9 @@ platworks-mcp = "platworks.mcp_server:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+platworks = ["data/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

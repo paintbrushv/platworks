@@ -1,4 +1,4 @@
-# Financial core candidate: B2/B3
+# Financial core candidate
 
 The price-search calculation now comes from `engine.backsolve.backsolve_price`.
 The engine CLI, engine MCP, agent, and umbrella use that one public API.
@@ -32,7 +32,9 @@ removes it. A concurrent replacement of the configured binary cannot change
 the bytes executed after the integrity check. The host's temporary directory
 must permit local executable files.
 
-Build the reviewed operating producer and set these host environment variables:
+The analysis extra installs the native producer wheel. The bridge locates its
+executable through installed distribution metadata, even when the scripts directory
+is outside PATH. A host may explicitly override it for a reviewed source build:
 
 ```bash
 export PLAT_BOXSCORE_EXACT_BIN=/absolute/path/to/boxscore-exact
@@ -40,8 +42,8 @@ export PLAT_BOXSCORE_EXACT_BIN=/absolute/path/to/boxscore-exact
 export PLAT_BOXSCORE_EXACT_SHA256=SHA256_OF_THAT_BINARY
 ```
 
-Pass the binary setting in your MCP launcher's `env` configuration too; clients
-may sanitize inherited environment variables. The umbrella response includes
+When using an override, pass it in your MCP launcher's `env` configuration too.
+Installed analysis wheels need no override. The umbrella response includes
 binary SHA-256, protocol version, input SHA-256, and `checked_i64_cents` provenance.
 
 The exact CLI supports canonical CSV/JSON imports, occupancy reconciliation,
@@ -57,10 +59,11 @@ shape cannot disclose. Run reviewed migration to resolve those cases.
 
 ## Remaining release gates
 
-These changes implement financial-core behavior. They do not constitute the
-complete v0.1 release. MCP 1 versus MCP 2 alignment, analysis extras, platform
-binary distribution, clean installations, original-file review and human
-approval flows, library/host acceptance, pilots, and publication remain.
-The Rust repository's root/Cargo license mismatch also needs resolution before
-publishing a package. General legacy `boxscore` features remain excluded from
-the exact-cent workflow.
+The packaging candidate aligns MCP 2, provides an exact analysis dependency set,
+ships native producer wheels, and runs doctor plus installed-workflow checks.
+See [installation and verification](installation.md) for the platform matrix,
+locks, and source pins. Cargo metadata now matches the Apache-2.0 root license.
+
+Original-file review and human approval flows, library and assistant-host
+acceptance, pilots, and package publication remain release work. General legacy
+`boxscore` features remain excluded from the exact-cent workflow.

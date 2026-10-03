@@ -6,6 +6,7 @@ There is no Python financial fallback.
 """
 
 import hashlib
+import importlib.metadata
 import json
 import os
 import re
@@ -49,6 +50,32 @@ def _money(value):
     # Validate the integer boundary; this performs no financial calculation.
     if abs(int(value.replace(".", ""))) > 9223372036854775807:
         _fail("INVALID_CONTRACT", "Operating producer exceeded the cent range.")
+
+
+def producer_path():
+    """Find the host override, installed wheel binary, or PATH executable."""
+    configured = os.environ.get("PLAT_BOXSCORE_EXACT_BIN")
+    if configured:
+        binary = shutil.which(configured)
+        if binary is None:
+            _fail("BACKEND_UNAVAILABLE", "Configured boxscore-exact executable is unavailable.")
+        return Path(binary)
+    try:
+        distribution = importlib.metadata.distribution("plat-operations")
+    except importlib.metadata.PackageNotFoundError:
+        distribution = None
+    if distribution:
+        name = "boxscore-exact.exe" if os.name == "nt" else "boxscore-exact"
+        for item in distribution.files or ():
+            if item.name == name:
+                binary = Path(distribution.locate_file(item))
+                if binary.is_file() and os.access(binary, os.X_OK):
+                    return binary.resolve()
+        _fail("BACKEND_UNAVAILABLE", "Reinstall plat-operations: its native executable is missing.")
+    binary = shutil.which("boxscore-exact")
+    if binary is None:
+        _fail("BACKEND_UNAVAILABLE", "Install platworks[analysis] or configure boxscore-exact.")
+    return Path(binary)
 
 
 def _run_bounded(args, request, *, timeout):
@@ -120,10 +147,7 @@ def _verified_binary(binary):
 
 def calculate(actuals, budgets):
     """Return the verified protocol envelope, including producer provenance."""
-    configured = os.environ.get("PLAT_BOXSCORE_EXACT_BIN", "boxscore-exact")
-    binary = shutil.which(configured)
-    if binary is None:
-        _fail("BACKEND_UNAVAILABLE", "Install boxscore-exact and configure its host path.")
+    binary = producer_path()
     try:
         request = json.dumps({"contract_version": CONTRACT_VERSION, "operation": "variance",
                               "currency": "USD", "expense_convention": "positive_costs",

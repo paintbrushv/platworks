@@ -2,6 +2,26 @@
 
 from platworks import ops_oracle
 
+
+def test_installed_producer_is_discovered_without_path_or_override(monkeypatch):
+    monkeypatch.delenv("PLAT_BOXSCORE_EXACT_BIN", raising=False)
+    monkeypatch.setenv("PATH", "")
+    result = ops_oracle.calculate(SNAPSHOT_ACTUALS, SNAPSHOT_BUDGETS)
+    assert result["result"]["noi_bridge"]["noi_variance"] == "499.50"
+
+
+def test_broken_installed_producer_does_not_fall_back_to_path(monkeypatch):
+    from types import SimpleNamespace
+
+    import pytest
+
+    monkeypatch.delenv("PLAT_BOXSCORE_EXACT_BIN", raising=False)
+    monkeypatch.setattr(ops_oracle.importlib.metadata, "distribution",
+                        lambda name: SimpleNamespace(files=[]))
+    monkeypatch.setattr(ops_oracle.shutil, "which", lambda name: "/unreviewed/producer")
+    with pytest.raises(ops_oracle.OpsProducerError, match="native executable is missing"):
+        ops_oracle.producer_path()
+
 # ------------------------------------------------- Rust-expected ground truth
 # Actual output of the real Rust boxscore::exact::variance owner functions
 # (plat-operations/boxscore/src/variance.rs) over the synthetic walkthrough
@@ -270,7 +290,7 @@ def test_atomic_binary_replacement_cannot_change_verified_executable(tmp_path, m
     from pathlib import Path
 
     configured = tmp_path / "configured-producer"
-    shutil.copy2(os.environ["PLAT_BOXSCORE_EXACT_BIN"], configured)
+    shutil.copy2(ops_oracle.producer_path(), configured)
     fingerprint = hashlib.sha256(configured.read_bytes()).hexdigest()
     monkeypatch.setenv("PLAT_BOXSCORE_EXACT_BIN", str(configured))
     monkeypatch.setenv("PLAT_BOXSCORE_EXACT_SHA256", fingerprint)
@@ -296,13 +316,12 @@ def test_atomic_binary_replacement_cannot_change_verified_executable(tmp_path, m
 
 def test_exact_csv_to_persistence_correction_and_harness_review(tmp_path):
     import json
-    import os
     import sqlite3
     import subprocess
 
     from platworks.wrappers import ops_review
 
-    binary = os.environ["PLAT_BOXSCORE_EXACT_BIN"]
+    binary = str(ops_oracle.producer_path())
     database = tmp_path / "exact.sqlite"
 
     def cli(*args):

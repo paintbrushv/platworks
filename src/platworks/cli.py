@@ -69,6 +69,26 @@ def get(name, as_json):
 
 
 @main.command()
+@click.option("--analysis", is_flag=True, help="Check every installed analysis component.")
+@click.option("--json", "as_json", is_flag=True, help="Emit machine-readable diagnostics.")
+def doctor(analysis, as_json):
+    """Check the local installation, packaged data, and producer contracts."""
+    from platworks.doctor import diagnose
+
+    report = diagnose(analysis)
+    if as_json:
+        click.echo(json.dumps(report, indent=2))
+    else:
+        click.echo(f"{report['profile']}: {report['status']}")
+        for check in report["checks"]:
+            click.echo(f"  {check['name']}: {check['status']}")
+            if check.get("hint"):
+                click.echo(f"    {check['hint']}")
+    if report["status"] == "incomplete":
+        raise SystemExit(2)
+
+
+@main.command()
 def mcp():
     """Run the platworks MCP server over stdio."""
     from platworks import mcp_server

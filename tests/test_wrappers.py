@@ -581,16 +581,10 @@ def test_evaluate_bid_missing_bid_is_typed_refusal():
 # ------------------------------------------------------------------ ops_review
 
 def _ops_snapshot_path():
-    """Locate the harness tree's synthetic walkthrough sample snapshot."""
-    import plat_harness
+    """Use the same packaged fixture in source and installed-wheel tests."""
+    from plat_harness.samples_data import walkthrough_path
 
-    harness_file = os.path.abspath(plat_harness.__file__)
-    repo_root = os.path.dirname(os.path.dirname(os.path.dirname(
-        os.path.dirname(harness_file))))
-    path = os.path.join(repo_root, "samples", "walkthrough", "ops_snapshot.sqlite")
-    if not os.path.exists(path):
-        pytest.skip("harness sample snapshot not installed with this layout")
-    return path
+    return str(walkthrough_path("ops_snapshot.sqlite"))
 
 
 def test_ops_review_over_synthetic_snapshot():

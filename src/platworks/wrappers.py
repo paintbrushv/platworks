@@ -478,11 +478,9 @@ def _default_ops_snapshot_path():
     Works for both an editable checkout and a wheel install (the harness
     ships the walkthrough fixtures as package data). Synthetic data only.
     """
-    from importlib.resources import as_file, files
+    from plat_harness.samples_data import walkthrough_path
 
-    with as_file(files("plat_harness").joinpath(
-            "samples_data/ops_snapshot.sqlite")) as path:
-        return str(path)
+    return str(walkthrough_path("ops_snapshot.sqlite"))
 
 
 def ops_review(asset_id, period=None, materiality=None, as_of_date=None,

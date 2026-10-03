@@ -1,0 +1,3 @@
+include requirements-*.lock release-sources.json
+recursive-include scripts *.py
+recursive-include docs *.md
