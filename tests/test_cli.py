@@ -79,7 +79,7 @@ def test_catalog_unknown_category_is_typed_refusal(runner):
         assert cat in result.output
 
 
-def test_catalog_private_components_make_no_public_claims(runner):
+def test_catalog_private_components_make_no_public_claims(runner, private_component):
     result = _invoke(runner, "catalog", "--json")
     payload = json.loads(result.output)
     private = [c for c in payload if c["public"] is False]

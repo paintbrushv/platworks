@@ -212,8 +212,8 @@ def test_tool_get_component_unknown_is_typed_refusal():
     assert "nope" in payload["error"]["message"]
 
 
-def test_tool_get_component_private_makes_no_public_claims():
-    result = _run(build_server().call_tool("get_component", {"name": "plat-agent"}))
+def test_tool_get_component_private_makes_no_public_claims(private_component):
+    result = _run(build_server().call_tool("get_component", {"name": private_component}))
     payload = _payload(result)
     comp = payload["component"]
     assert comp["public"] is False

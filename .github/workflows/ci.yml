@@ -16,19 +16,21 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install (with sibling backends from their public repos)
+      - name: Install exact v0.1 baseline backends
         run: |
           pip install -e ".[dev]"
-          # The 8 product tools wrap the sibling deterministic services; the
-          # stdio e2e tests exercise them for real. Until the siblings are on
-          # PyPI, install them from their public repositories.
+          # Source pins match the development baseline in plat-harness.
+          # PyPI releases currently lag these reviewed producer commits.
           pip install \
-            git+https://github.com/paintbrushv/plat-multifamily-underwriting.git \
-            git+https://github.com/paintbrushv/plat-costmodel.git \
-            git+https://github.com/paintbrushv/plat-harness.git
+            git+https://github.com/paintbrushv/plat-multifamily-underwriting.git@10a88ed393e6d6611c8c710b5e15ef64e128af6b \
+            git+https://github.com/paintbrushv/plat-costmodel.git@518142ecb8771e52fcc9985237fe1a6f97a76168 \
+            git+https://github.com/paintbrushv/plat-harness.git@db85b94eedcba3dccb4db6b5a61a4623af870ca2
+          pip check
+      - name: Verify catalog against recorded evidence
+        run: python scripts/verify_catalog.py
       - name: Test (full suite, stdio e2e included)
         run: pytest -q
       - name: Lint
         run: |
-          ruff check src tests
-          git diff --check || true
+          ruff check src tests scripts/verify_catalog.py
+          git diff --check

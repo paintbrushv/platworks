@@ -48,7 +48,7 @@ def test_page_lists_every_public_component_with_verified_link(tmp_path):
             assert f'href="{c["repo"]}"' in html
 
 
-def test_page_is_honest_about_private_components(tmp_path):
+def test_page_is_honest_about_private_components(tmp_path, private_component):
     out = str(tmp_path / "index.html")
     landing_page.render_page(out)
     html = open(out).read()

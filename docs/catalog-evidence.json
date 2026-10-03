@@ -1,0 +1,78 @@
+{
+  "verified_on": "2026-10-03",
+  "source": "GitHub public repository API",
+  "components": [
+    {
+      "name": "plat-multifamily-underwriting",
+      "repository": "https://github.com/paintbrushv/plat-multifamily-underwriting",
+      "visibility": "public",
+      "description": "Deterministic multifamily underwriting engine. Numbers come from the engine, never from a model.",
+      "license": "Apache-2.0",
+      "default_branch": "main"
+    },
+    {
+      "name": "plat-harness",
+      "repository": "https://github.com/paintbrushv/plat-harness",
+      "visibility": "public",
+      "description": "Agent-agnostic control plane for multifamily underwriting and asset operations. The model is rented; certified numbers come from tools.",
+      "license": "Apache-2.0",
+      "default_branch": "main"
+    },
+    {
+      "name": "plat-market-study-agent",
+      "repository": "https://github.com/paintbrushv/plat-market-study-agent",
+      "visibility": "public",
+      "description": "Market Study Agent: expert-level multifamily market studies with strict public-vs-licensed data separation. Synthetic/config-driven validation only.",
+      "license": "Apache-2.0",
+      "default_branch": "main"
+    },
+    {
+      "name": "plat-operations",
+      "repository": "https://github.com/paintbrushv/plat-operations",
+      "visibility": "public",
+      "description": "Local-first multifamily NOI variance intelligence harness (BOXSCORE). Numbers come from the deterministic engine; synthetic sample data only.",
+      "license": "Apache-2.0",
+      "default_branch": "main"
+    },
+    {
+      "name": "geostack",
+      "repository": "https://github.com/paintbrushv/geostack",
+      "visibility": "public",
+      "description": "PostGIS/GIS utility layer for multifamily market analytics. Synthetic fixtures only.",
+      "license": "Apache-2.0",
+      "default_branch": "main"
+    },
+    {
+      "name": "plat-agent",
+      "repository": "https://github.com/paintbrushv/plat-agent",
+      "visibility": "public",
+      "description": "Orchestration agent for multifamily deal analysis via MCP tool composition. Synthetic fixtures only.",
+      "license": "Apache-2.0",
+      "default_branch": "main"
+    },
+    {
+      "name": "plat-costmodel",
+      "repository": "https://github.com/paintbrushv/plat-costmodel",
+      "visibility": "public",
+      "description": "Multifamily cost estimates, ROI gating, SOW generation, and bid evaluation \u2014 MCP server included. Synthetic fixtures only.",
+      "license": "Apache-2.0",
+      "default_branch": "main"
+    },
+    {
+      "name": "plat-submarket-atlas",
+      "repository": "https://github.com/paintbrushv/plat-submarket-atlas",
+      "visibility": "public",
+      "description": "Submarket-level multifamily scoring on parcel data: composite and named subscores. Requires PostGIS + geostack.",
+      "license": "Apache-2.0",
+      "default_branch": "main"
+    },
+    {
+      "name": "plat-supply-demand",
+      "repository": "https://github.com/paintbrushv/plat-supply-demand",
+      "visibility": "public",
+      "description": "Metro-level multifamily supply pipeline and absorption analytics: deliveries, under construction, planned; estimation libraries and skills. Synthetic/config-driven validation only.",
+      "license": "MIT",
+      "default_branch": "main"
+    }
+  ]
+}
