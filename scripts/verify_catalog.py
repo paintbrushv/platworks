@@ -11,6 +11,8 @@ from platworks import catalog
 def verify(live=False):
     snapshot = Path(__file__).resolve().parents[1] / "docs/catalog-evidence.json"
     evidence = json.loads(snapshot.read_text())
+    if evidence["verified_on"] != catalog.VERIFIED_ON:
+        raise ValueError("catalog verification date differs from the evidence snapshot")
     recorded = {item["name"]: item for item in evidence["components"]}
     public = {item["name"]: item for item in catalog.list_components() if item["public"]}
     if set(recorded) != set(public):

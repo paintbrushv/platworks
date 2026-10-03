@@ -27,11 +27,17 @@ Style: ruff (`line-length = 100`, `target-version = py311`); imports sorted.
 
 ## Adding a component to the catalog
 
-1. Verify the repository is public and fetch its exact GitHub description
+1. Verify the repository is public and fetch its exact GitHub description and license
    (`https://api.github.com/repos/paintbrushv/<name>`).
 2. Add the entry to `_REGISTRY` in `catalog.py` — public entries get the
-   verified URL and verbatim description; private entries get `repo: None`
+   verified URL, license, and verbatim description; private entries get `repo: None`
    and `description: None`.
-3. Extend `tests/test_catalog.py` with the new component's expectations.
-4. Run the full suite: catalog, CLI, landing, demo, and docs drift gates all
-   derive from the catalog and must stay green.
+3. Record the verified public metadata in `docs/catalog-evidence.json`. When
+   refreshing the snapshot, recheck all public entries and update both its
+   `verified_on` date and `catalog.VERIFIED_ON`.
+4. Extend `tests/test_catalog.py` with the new component's expectations, then
+   regenerate the committed page with `platworks landing docs/index.html --force`.
+5. Run `python scripts/verify_catalog.py` and the full test suite: catalog,
+   CLI, landing, demo, and docs drift gates must stay green. Run
+   `python scripts/verify_catalog.py --live` before release to detect changes
+   since the recorded snapshot.

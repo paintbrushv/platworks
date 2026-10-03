@@ -72,6 +72,19 @@ def test_page_carries_synthetic_and_license_notices(tmp_path):
     html = open(out).read().lower()
     assert "apache-2.0" in html
     assert "platworks" in html
+    assert "all repositories are apache-2.0" not in html
+    assert "platworks is licensed under apache-2.0" in html
+    assert "component licenses are listed on each card" in html
+    assert '<span class="badge">mit</span>' in html
+    assert "synthetic" in html
+
+
+def test_page_uses_catalog_verification_date(monkeypatch):
+    monkeypatch.setattr(catalog, "VERIFIED_ON", "2099-01-02")
+    html = landing_page.build_html()
+    assert "verified against the GitHub API on 2099-01-02" in html
+    assert "verified GitHub metadata (verified 2099-01-02)" in html
+    assert "2026-09-24" not in html
 
 
 def test_page_contains_no_private_paths(tmp_path):

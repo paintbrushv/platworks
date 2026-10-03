@@ -4,7 +4,7 @@ Single source of truth for what exists in the ecosystem and what may be
 claimed publicly. Rules:
 
 - Every public component entry was verified against the GitHub API
-  (``https://api.github.com/repos/paintbrushv/<name>``) on 2026-10-03;
+  (``https://api.github.com/repos/paintbrushv/<name>``) on ``VERIFIED_ON``;
   descriptions below are copied from the verified GitHub descriptions.
 - Private components (repositories named ``*-uplift`` or not yet
   published) carry ``public: False`` and make **no** public claims:
@@ -14,6 +14,9 @@ claimed publicly. Rules:
 """
 
 import copy
+
+#: Date of the public metadata snapshot in docs/catalog-evidence.json.
+VERIFIED_ON = "2026-10-03"
 
 CATEGORIES = (
     "underwriting_engine",
