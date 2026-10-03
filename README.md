@@ -17,10 +17,15 @@ one honest landing page.
 | [plat-market-study-agent](https://github.com/paintbrushv/plat-market-study-agent) | Expert-level multifamily market studies with strict data separation |
 | [plat-operations](https://github.com/paintbrushv/plat-operations) | Local-first NOI variance intelligence harness (BOXSCORE, Rust) |
 | [geostack](https://github.com/paintbrushv/geostack) | PostGIS/GIS utility layer for multifamily market analytics |
+| [plat-agent](https://github.com/paintbrushv/plat-agent) | Orchestration through MCP tool composition |
+| [plat-costmodel](https://github.com/paintbrushv/plat-costmodel) | Cost estimates, renovation ROI, scopes of work, and bid evaluation |
+| [plat-submarket-atlas](https://github.com/paintbrushv/plat-submarket-atlas) | Parcel-based submarket scoring; requires PostGIS and geostack |
+| [plat-supply-demand](https://github.com/paintbrushv/plat-supply-demand) | Supply pipeline and absorption analytics (MIT license) |
 
-A further four components (orchestration, cost modeling, submarket atlas, supply/demand)
-are private and not yet published; the catalog and MCP server report them as private with
-no repository links.
+All nine catalogued repositories are public as of 2026-10-03. Public visibility
+is separate from installation, financial acceptance, and assistant-host support.
+The [catalog evidence](docs/catalog-evidence.json) records verified metadata;
+[baseline status](docs/v0.1-baseline.md) lists the remaining release work.
 
 ## Install
 
@@ -122,7 +127,7 @@ the eleven MCP tools the server ships, and copy-paste install instructions.
 ## Honest scope
 
 - **Catalog claims are verified.** Public repository URLs and descriptions were
-  verified against the GitHub API on 2026-09-24 and are copied verbatim; drift-gate
+  verified against the GitHub API on 2026-10-03 and are copied verbatim; drift-gate
   tests fail the suite if a doc or generated page claims an unverified URL.
 - **Synthetic data only.** No real deal, tenant, owner, or portfolio data ships in
   this package or its demo.
@@ -140,4 +145,5 @@ tests/            pytest suite (drift gates included; slow marks for stdio e2e)
 
 ## License
 
-Apache-2.0 — see [LICENSE](LICENSE). Demo data is synthetic and marked as such.
+Apache-2.0 for this umbrella — see [LICENSE](LICENSE). Component licenses are
+listed separately in the catalog; `plat-supply-demand` is MIT. Demo data is synthetic.

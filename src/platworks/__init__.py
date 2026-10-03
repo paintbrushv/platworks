@@ -3,7 +3,7 @@
 Exposes a verified component catalog and an MCP server that serves it.
 
 All data in this package is public metadata about sibling repositories
-(verified against the GitHub API on 2026-09-24) or synthetic demo data.
+(verified against the GitHub API; see catalog.VERIFIED_ON) or synthetic demo data.
 No deal, tenant, or portfolio data ships in this package.
 """
 

@@ -4,7 +4,7 @@ Single source of truth for what exists in the ecosystem and what may be
 claimed publicly. Rules:
 
 - Every public component entry was verified against the GitHub API
-  (``https://api.github.com/repos/paintbrushv/<name>``) on 2026-09-24;
+  (``https://api.github.com/repos/paintbrushv/<name>``) on ``VERIFIED_ON``;
   descriptions below are copied from the verified GitHub descriptions.
 - Private components (repositories named ``*-uplift`` or not yet
   published) carry ``public: False`` and make **no** public claims:
@@ -14,6 +14,9 @@ claimed publicly. Rules:
 """
 
 import copy
+
+#: Date of the public metadata snapshot in docs/catalog-evidence.json.
+VERIFIED_ON = "2026-10-03"
 
 CATEGORIES = (
     "underwriting_engine",
@@ -120,10 +123,13 @@ _REGISTRY = [
         "category": "orchestration",
         "language": "Python",
         "license": "Apache-2.0",
-        "public": False,
-        "repo": None,
-        "description": None,
-        "status": "private",
+        "public": True,
+        "repo": f"{_ORG}/plat-agent",
+        "description": (
+            "Orchestration agent for multifamily deal analysis via MCP tool "
+            "composition. Synthetic fixtures only."
+        ),
+        "status": "public",
         "tags": ["orchestration", "mcp"],
     },
     {
@@ -131,10 +137,13 @@ _REGISTRY = [
         "category": "cost_modeling",
         "language": "Python",
         "license": "Apache-2.0",
-        "public": False,
-        "repo": None,
-        "description": None,
-        "status": "private",
+        "public": True,
+        "repo": f"{_ORG}/plat-costmodel",
+        "description": (
+            "Multifamily cost estimates, ROI gating, SOW generation, and bid "
+            "evaluation — MCP server included. Synthetic fixtures only."
+        ),
+        "status": "public",
         "tags": ["cost-modeling", "capex"],
     },
     {
@@ -142,21 +151,28 @@ _REGISTRY = [
         "category": "geospatial",
         "language": "Python",
         "license": "Apache-2.0",
-        "public": False,
-        "repo": None,
-        "description": None,
-        "status": "private",
+        "public": True,
+        "repo": f"{_ORG}/plat-submarket-atlas",
+        "description": (
+            "Submarket-level multifamily scoring on parcel data: composite "
+            "and named subscores. Requires PostGIS + geostack."
+        ),
+        "status": "public",
         "tags": ["submarkets", "atlas"],
     },
     {
         "name": "plat-supply-demand",
         "category": "market_study",
         "language": "Python",
-        "license": "Apache-2.0",
-        "public": False,
-        "repo": None,
-        "description": None,
-        "status": "private",
+        "license": "MIT",
+        "public": True,
+        "repo": f"{_ORG}/plat-supply-demand",
+        "description": (
+            "Metro-level multifamily supply pipeline and absorption analytics: "
+            "deliveries, under construction, planned; estimation libraries and "
+            "skills. Synthetic/config-driven validation only."
+        ),
+        "status": "public",
         "tags": ["supply", "demand", "pipeline"],
     },
 ]

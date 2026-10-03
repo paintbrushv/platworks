@@ -2,7 +2,7 @@
 
 The catalog is the umbrella's single source of truth for ecosystem
 components. Every public claim (repo URL, description, license) was
-verified against the GitHub API on 2026-09-24; private components make
+verified against the GitHub API on 2026-10-03; private components make
 no public claims at all.
 """
 
@@ -16,9 +16,6 @@ PUBLIC_NAMES = [
     "plat-market-study-agent",
     "plat-operations",
     "geostack",
-]
-
-PRIVATE_NAMES = [
     "plat-agent",
     "plat-costmodel",
     "plat-submarket-atlas",
@@ -32,10 +29,9 @@ def test_list_components_covers_all_public_repos():
         assert name in names, f"expected public component {name!r} in catalog"
 
 
-def test_list_components_covers_all_private_components():
+def test_list_components_covers_private_components(private_component):
     names = {c["name"] for c in catalog.list_components()}
-    for name in PRIVATE_NAMES:
-        assert name in names, f"expected private component {name!r} in catalog"
+    assert private_component in names
 
 
 def test_public_components_carry_verified_fields():
@@ -46,16 +42,15 @@ def test_public_components_carry_verified_fields():
         assert c["repo"] == f"https://github.com/paintbrushv/{name}", name
         assert isinstance(c["description"], str) and len(c["description"]) > 10, name
         assert c["category"] in catalog.CATEGORIES, name
-        assert c["license"] == "Apache-2.0", name
+        assert c["license"] == ("MIT" if name == "plat-supply-demand" else "Apache-2.0"), name
         assert c["language"] in catalog.LANGUAGES, name
 
 
-def test_private_components_make_no_public_claims():
-    for name in PRIVATE_NAMES:
-        c = catalog.get_component(name)
-        assert c["public"] is False, name
-        assert c["repo"] is None, f"{name} must not claim a public repo URL"
-        assert c["description"] is None, f"{name} must not ship an unverified description"
+def test_private_components_make_no_public_claims(private_component):
+    c = catalog.get_component(private_component)
+    assert c["public"] is False
+    assert c["repo"] is None
+    assert c["description"] is None
 
 
 def test_no_private_uplift_remotes_leak_into_public_urls():
