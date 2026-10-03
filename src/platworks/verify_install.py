@@ -11,6 +11,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+from contextlib import closing
 from importlib.resources import files
 from pathlib import Path
 
@@ -127,7 +128,7 @@ def verify():
         first = cli(*args)["revision_id"]
         issued = cli("issue", "--database", database, "--revision", first)
         assert issued["variance"]["noi_bridge"]["noi_variance"] == "0.01"
-        with sqlite3.connect(database) as connection:
+        with closing(sqlite3.connect(database)) as connection:
             original = connection.execute("SELECT body FROM exact_reports").fetchone()[0]
             types = connection.execute("SELECT DISTINCT typeof(amount_cents) FROM exact_gl")
             assert types.fetchall() == [("integer",)], "Money is not integer cents"
@@ -137,7 +138,7 @@ def verify():
         ]
         corrected = cli("issue", "--database", database, "--revision", second)
         assert corrected["changes"]["actual_noi"] == "0.01"
-        with sqlite3.connect(database) as connection:
+        with closing(sqlite3.connect(database)) as connection:
             assert (
                 connection.execute(
                     "SELECT body FROM exact_reports WHERE id=?", (issued["report_id"],)

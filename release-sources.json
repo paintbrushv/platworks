@@ -9,10 +9,10 @@
   },
   "plat-harness": {
     "version": "0.1.1",
-    "sha": "21c982f3b374fe568975adfcd4513904b4c7b5f5"
+    "sha": "a57acc496b1bc945d22c1db8bd1ea324fb8ef697"
   },
   "plat-operations": {
     "version": "0.1.1",
-    "sha": "60268c38f4bcb815ce12f9d9b4f6b024dc30ef59"
+    "sha": "e2c3837fcdac9fdf24bf2b397c161bf01a9e94a1"
   }
 }
