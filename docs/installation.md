@@ -98,7 +98,11 @@ set the minimum Python version. Package metadata bounds cryptography to the comp
 macOS, so ordinary installs also avoid a local Rust build. Re-run the full clean-install matrix.
 
 A release tag must equal the metadata version, use an unused PyPI version, and
-pass CI before the workflow can upload the same tested artifacts. Publication
+pass CI before the workflow can upload the same tested artifacts. The umbrella
+release additionally requires all exact analysis dependencies to be published on
+PyPI with non-yanked wheels for every supported target. Publish the four producer
+packages first; `python scripts/check_published_dependencies.py` verifies this
+prerequisite and blocks the umbrella upload while it is incomplete. Publication
 also needs the repository's configured PyPI trusted publisher/environment. After
 publication, repeat the checks using registry downloads and compare hashes to
 the reviewed evidence before announcing the release.

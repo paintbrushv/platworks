@@ -18,8 +18,19 @@ jobs:
   verify:
     needs: gate
     uses: ./.github/workflows/ci.yml
-  publish:
+  published-dependencies:
     needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install 'packaging>=24,<27'
+      - name: Require published analysis versions and all supported native wheels
+        run: python scripts/check_published_dependencies.py
+  publish:
+    needs: published-dependencies
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
