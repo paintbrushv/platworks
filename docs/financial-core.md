@@ -27,6 +27,11 @@ identity. Missing binaries, timeouts, invalid precision, overflow, and
 unsupported contracts produce typed failures. The host controls the executable;
 MCP clients cannot supply executable paths or arguments.
 
+Each call hashes and executes a private temporary copy of the producer, then
+removes it. A concurrent replacement of the configured binary cannot change
+the bytes executed after the integrity check. The host's temporary directory
+must permit local executable files.
+
 Build the reviewed operating producer and set these host environment variables:
 
 ```bash

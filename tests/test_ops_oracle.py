@@ -263,6 +263,37 @@ def test_producer_refuses_subtraction_outside_reversible_money_range():
     assert exc.value.code == "MONEY_OVERFLOW"
 
 
+def test_atomic_binary_replacement_cannot_change_verified_executable(tmp_path, monkeypatch):
+    import hashlib
+    import os
+    import shutil
+    from pathlib import Path
+
+    configured = tmp_path / "configured-producer"
+    shutil.copy2(os.environ["PLAT_BOXSCORE_EXACT_BIN"], configured)
+    fingerprint = hashlib.sha256(configured.read_bytes()).hexdigest()
+    monkeypatch.setenv("PLAT_BOXSCORE_EXACT_BIN", str(configured))
+    monkeypatch.setenv("PLAT_BOXSCORE_EXACT_SHA256", fingerprint)
+    run = ops_oracle._run_bounded
+    executed = []
+
+    def replace_before_exec(args, request, **kwargs):
+        replacement = tmp_path / "next-producer"
+        replacement.write_bytes(b"replacement must never execute")
+        replacement.chmod(0o700)
+        os.replace(replacement, configured)
+        private = Path(args[0])
+        assert private != configured
+        assert hashlib.sha256(private.read_bytes()).hexdigest() == fingerprint
+        executed.append(private)
+        return run(args, request, **kwargs)
+
+    monkeypatch.setattr(ops_oracle, "_run_bounded", replace_before_exec)
+    result = ops_oracle.calculate([], [])
+    assert result["producer"]["binary_sha256"] == fingerprint
+    assert executed and all(not path.exists() for path in executed)
+
+
 def test_exact_csv_to_persistence_correction_and_harness_review(tmp_path):
     import json
     import os

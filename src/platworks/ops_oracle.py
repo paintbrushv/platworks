@@ -14,6 +14,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 CONTRACT_VERSION = "plat.ops/1"
@@ -98,6 +99,25 @@ def _run_bounded(args, request, *, timeout):
                     reader.join(timeout=1)
 
 
+@contextmanager
+def _verified_binary(binary):
+    """Execute a private copy of the exact bytes whose digest is reported."""
+    with tempfile.TemporaryDirectory(prefix="plat-producer-") as directory:
+        executable = Path(directory) / ("boxscore-exact.exe" if os.name == "nt"
+                                        else "boxscore-exact")
+        digest = hashlib.sha256()
+        with Path(binary).open("rb") as source, executable.open("xb") as target:
+            while chunk := source.read(1024 * 1024):
+                digest.update(chunk)
+                target.write(chunk)
+        executable.chmod(0o500)
+        fingerprint = digest.hexdigest()
+        expected = os.environ.get("PLAT_BOXSCORE_EXACT_SHA256")
+        if expected and expected != fingerprint:
+            _fail("PRODUCER_MISMATCH", "Operating producer does not match its configured hash.")
+        yield executable, fingerprint
+
+
 def calculate(actuals, budgets):
     """Return the verified protocol envelope, including producer provenance."""
     configured = os.environ.get("PLAT_BOXSCORE_EXACT_BIN", "boxscore-exact")
@@ -105,22 +125,17 @@ def calculate(actuals, budgets):
     if binary is None:
         _fail("BACKEND_UNAVAILABLE", "Install boxscore-exact and configure its host path.")
     try:
-        path = Path(binary).resolve(strict=True)
-        with path.open("rb") as stream:
-            fingerprint = hashlib.file_digest(stream, "sha256").hexdigest()
         request = json.dumps({"contract_version": CONTRACT_VERSION, "operation": "variance",
                               "currency": "USD", "expense_convention": "positive_costs",
                               "actuals": actuals, "budgets": budgets},
                              allow_nan=False, separators=(",", ":")).encode("utf-8")
-    except (OSError, ValueError, TypeError):
-        _fail("INVALID_INPUT", "Cannot read the configured producer or serialize the GL request.")
-    expected = os.environ.get("PLAT_BOXSCORE_EXACT_SHA256")
-    if expected and expected != fingerprint:
-        _fail("PRODUCER_MISMATCH", "Operating producer does not match its configured hash.")
+    except (ValueError, TypeError):
+        _fail("INVALID_INPUT", "Cannot serialize the GL request.")
     if len(request) > MAX_REQUEST_BYTES:
         _fail("INPUT_LIMIT", "Operating request exceeds 2 MiB.")
     try:
-        completed = _run_bounded([str(path), "protocol"], request, timeout=TIMEOUT_SECONDS)
+        with _verified_binary(binary) as (path, fingerprint):
+            completed = _run_bounded([str(path), "protocol"], request, timeout=TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         _fail("PRODUCER_TIMEOUT", "Operating producer exceeded its time limit.")
     except OSError:
