@@ -40,7 +40,7 @@ jobs:
           pip install \
             git+https://github.com/paintbrushv/plat-multifamily-underwriting.git@b42764be7d0bf278272ff29ce36e0c98e2c10f5f \
             git+https://github.com/paintbrushv/plat-costmodel.git@518142ecb8771e52fcc9985237fe1a6f97a76168 \
-            git+https://github.com/paintbrushv/plat-harness.git@22b06778cebec91c9617e7776ec8b3760ad6fe00
+            git+https://github.com/paintbrushv/plat-harness.git@53015df7835cc7495e40c3a4e6116dfdf4c2e213
           pip check
       - name: Verify catalog against recorded evidence
         run: python scripts/verify_catalog.py
