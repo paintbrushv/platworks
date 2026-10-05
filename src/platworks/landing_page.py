@@ -163,7 +163,7 @@ def build_html():
 into your editor as one MCP server: verified underwriting engines,
 agent control planes, market studies, and asset operations.</p>
 <p class="sub">{counts['public']} public repositories &middot; {counts['total']}
-catalogued components &middot; {tools.TOOL_COUNT} MCP tools &middot; umbrella
+catalogued components &middot; {tools.TOOL_COUNT} catalog tools &middot; umbrella
 package v{_esc(__version__)} &middot; Apache-2.0</p>
 </header>
 
@@ -172,8 +172,8 @@ package v{_esc(__version__)} &middot; Apache-2.0</p>
 <div class="principle">
 <strong>{_esc(tools.PRINCIPLE)}</strong><br>
 Every component in this ecosystem is a deterministic engine or a
-harness around one. Language models arrange the work; certified numbers
-always come from the tools.
+harness around one. Language models arrange the work; financial calculations
+come from the tools. Source facts and assumptions still require human review.
 </div>
 </section>
 

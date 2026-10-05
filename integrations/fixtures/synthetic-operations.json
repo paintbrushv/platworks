@@ -1,0 +1,29 @@
+{
+  "actuals": [
+    {
+      "account_code": "4000",
+      "account_name": "Rent",
+      "amount": "0.30",
+      "category": "rental income"
+    }
+  ],
+  "budgets": [
+    {
+      "account_code": "4000",
+      "account_name": "Rent",
+      "amount": "0.29",
+      "category": "rental income"
+    }
+  ],
+  "currency": "USD",
+  "expense_convention": "positive_costs",
+  "period": "2026-05",
+  "property": "synthetic-ops",
+  "snapshot": {
+    "as_of_date": "2026-05-31",
+    "down_units": 0,
+    "occupied_units": 9,
+    "vacant_units": 1
+  },
+  "unit_count": 10
+}

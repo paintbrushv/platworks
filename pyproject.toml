@@ -17,6 +17,9 @@ classifiers = [
 dependencies = [
     "mcp>=2.3,<3",
     "anyio>=4.0",
+    "httpx2>=2.13,<3",
+    "jsonschema>=4.26,<5",
+    "uvicorn>=0.54,<0.55; sys_platform != 'emscripten'",
     "click>=8.0",
     "packaging>=24,<27",
     # Keep the standard catalog/analysis install on prebuilt Intel macOS wheels.
@@ -38,12 +41,13 @@ dev = [
 [project.scripts]
 platworks = "platworks.cli:main"
 platworks-mcp = "platworks.mcp_server:main"
+platworks-mcp-http = "platworks.mcp_http:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-platworks = ["data/*.json"]
+platworks = ["data/*.json", "data/library/*.json"]
 "platworks.local_review" = ["static/*.html", "static/*.js", "static/*.css"]
 
 [tool.pytest.ini_options]

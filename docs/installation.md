@@ -13,7 +13,7 @@ available on PyPI. No tag or upload is part of the build.
 
 ## Two install profiles
 
-`platworks` provides the catalog and MCP stdio server. `platworks[analysis]`
+`platworks` provides the catalog, packaged reference library, and MCP stdio/HTTP servers. `platworks[analysis]`
 adds the exact producer versions above, packaged synthetic examples, ingestion
 and PDF dependencies, and the native operating executable. The agent remains a
 separate optional application with its own tested lock and producer identities.
@@ -112,3 +112,18 @@ prerequisite and blocks the umbrella upload while it is incomplete. Publication
 also needs the repository's configured PyPI trusted publisher/environment. After
 publication, repeat the checks using registry downloads and compare hashes to
 the reviewed evidence before announcing the release.
+
+## Library and assistant transport checks
+
+```bash
+python -I -m platworks.verify_integrations
+# With the analysis wheels installed:
+python -I -m platworks.verify_integrations --analysis
+```
+
+These probes start actual stdio and local Streamable HTTP clients, compare schemas,
+retrieve versioned references, check exact-cent previews, and inspect temporary
+files/logs. Both probes use synthetic data. They do not establish acceptance in an
+assistant account. See [assistant setup](assistant-integrations.md) and
+[deployment files](../deploy/README.md). `platworks doctor` also validates the
+packaged index and HTTP imports.

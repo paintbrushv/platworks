@@ -31,9 +31,11 @@ def test_registry_declares_eleven_tools():
 
 def test_server_registers_exactly_the_registry_tools():
     from platworks import wrappers
+    from platworks.library_tools import COMMON_TOOLS, LOCAL_TOOLS
     registered = _run(build_server().list_tools())
-    assert {t.name for t in registered} == set(tools.TOOL_NAMES) | set(wrappers.PRODUCT_TOOL_NAMES)
-    assert len(registered) == 19
+    assert {t.name for t in registered} == (set(tools.TOOL_NAMES)
+        | set(wrappers.PRODUCT_TOOL_NAMES) | COMMON_TOOLS | LOCAL_TOOLS)
+    assert len(registered) == 25
 
 
 def test_every_registered_tool_is_described():
@@ -60,7 +62,7 @@ def test_landing_page_lists_every_tool_from_the_registry():
     html = landing_page.build_html()
     for name in tools.TOOL_NAMES:
         assert name in html, f"landing page does not list tool {name}"
-    assert f"{tools.TOOL_COUNT} MCP tools" in html
+    assert f"{tools.TOOL_COUNT} catalog tools" in html
 
 
 def test_tool_results_carry_no_private_paths():

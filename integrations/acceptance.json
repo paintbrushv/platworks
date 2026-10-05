@@ -1,0 +1,64 @@
+{
+  "checked_on": "2026-10-05",
+  "endpoint_deployed": false,
+  "hosting_decision": "prepare_files_choose_host_later",
+  "automated_protocol_evidence": "CI install and container artifacts; not host acceptance",
+  "hosts": {
+    "ChatGPT": {
+      "status": "pending",
+      "conversation_evidence": null,
+      "tester": null,
+      "attachment_checks": {
+        "reference_citation": false,
+        "extraction_review": false,
+        "exact_cent_preview": false,
+        "missing_budget_blocker": false,
+        "injection_not_approval": false,
+        "privacy": false
+      },
+      "blocker": "Public hosting and actual account session pending"
+    },
+    "Claude": {
+      "status": "pending",
+      "conversation_evidence": null,
+      "tester": null,
+      "attachment_checks": {
+        "reference_citation": false,
+        "extraction_review": false,
+        "exact_cent_preview": false,
+        "missing_budget_blocker": false,
+        "injection_not_approval": false,
+        "privacy": false
+      },
+      "blocker": "Actual local or remote account session pending"
+    },
+    "Grok.com": {
+      "status": "pending",
+      "conversation_evidence": null,
+      "tester": null,
+      "attachment_checks": {
+        "reference_citation": false,
+        "extraction_review": false,
+        "exact_cent_preview": false,
+        "missing_budget_blocker": false,
+        "injection_not_approval": false,
+        "privacy": false
+      },
+      "blocker": "Consumer custom MCP path and actual account session unverified"
+    },
+    "Muse.ai": {
+      "status": "pending",
+      "conversation_evidence": null,
+      "tester": null,
+      "attachment_checks": {
+        "reference_citation": false,
+        "extraction_review": false,
+        "exact_cent_preview": false,
+        "missing_budget_blocker": false,
+        "injection_not_approval": false,
+        "privacy": false
+      },
+      "blocker": "Integration specification and approval route unverified"
+    }
+  }
+}

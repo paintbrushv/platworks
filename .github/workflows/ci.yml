@@ -26,6 +26,7 @@ jobs:
               stream.write('operations_sha=' + sources['plat-operations']['sha'] + '\n')
           PY
       - run: python scripts/release_gate.py
+      - run: python scripts/build_library.py --check
       - run: pip install build twine ruff
       - run: python scripts/build_components.py
       - run: twine check dist/* wheelhouse/*
@@ -129,3 +130,36 @@ jobs:
             *-check.json
             release-sources.json
             browser-evidence/
+
+  container:
+    needs: [build, native]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-wheels
+          path: wheelhouse/
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-ubuntu-22.04
+          path: wheelhouse/
+      - name: Prepare hashed offline container context
+        run: python scripts/prepare_container.py --wheelhouse wheelhouse --output /tmp/plat-oci-context
+      - name: Build Python and Rust runtime image
+        run: docker build --network=none --build-arg SOURCE_REVISION=${{ github.sha }} -t platworks:ci /tmp/plat-oci-context
+      - name: Validate production proxy configuration
+        run: docker run --rm -e MCP_DOMAIN=mcp.example.test -v "$PWD/deploy/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2@sha256:8dc9fa87b36b25303d1c67d2a09f5824b7f3bfd72cb052f246e5da2133fe29a8 caddy validate --config /etc/caddy/Caddyfile
+      - name: Exercise the installed container with network isolation
+        run: python scripts/check_container.py --image platworks:ci --output container-check.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: container-evidence
+          path: |
+            container-check.json
+            /tmp/plat-oci-context/manifest.json

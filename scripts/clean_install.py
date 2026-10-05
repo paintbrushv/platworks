@@ -104,6 +104,10 @@ def verify(wheelhouse, profile):
                 "print(json.dumps({'status':'passed','doctor':d,'catalog_mcp':True}))"
             )
             probe = json.loads(run("-c", code))
+        integration_args = ["-m", "platworks.verify_integrations"]
+        if profile == "analysis":
+            integration_args.append("--analysis")
+        probe["integrations"] = json.loads(run(*integration_args))
         installed = json.loads(run("-m", "pip", "list", "--format=json"))
     return {
         "status": "passed",
