@@ -23,6 +23,11 @@ CREATE TABLE IF NOT EXISTS reports (id TEXT PRIMARY KEY, draft TEXT UNIQUE NOT N
  item TEXT NOT NULL, parent TEXT UNIQUE, body_sha TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS approvals (id TEXT PRIMARY KEY, body_sha TEXT NOT NULL,
  payload_sha TEXT NOT NULL, actor TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS draft_index (id TEXT PRIMARY KEY, kind TEXT NOT NULL,
+ subject TEXT NOT NULL, period TEXT, blocked INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS source_index (draft TEXT NOT NULL, role TEXT NOT NULL,
+ sha TEXT NOT NULL, filename TEXT NOT NULL, PRIMARY KEY(draft, role));
+CREATE INDEX IF NOT EXISTS source_index_sha ON source_index(sha);
 """
 
 
@@ -60,13 +65,30 @@ class Workspace:
             if versions and versions != [(CONTRACT,)]:
                 refuse("WORKSPACE_VERSION", "This workspace uses a different review contract.")
             connection.execute("INSERT OR IGNORE INTO metadata VALUES (?)", (CONTRACT,))
-            for table in ("blobs", "drafts", "executions", "reports", "approvals", "metadata"):
+            for table in (
+                "blobs",
+                "drafts",
+                "executions",
+                "reports",
+                "approvals",
+                "metadata",
+                "draft_index",
+                "source_index",
+            ):
                 for verb in ("UPDATE", "DELETE"):
                     connection.execute(
                         f"CREATE TRIGGER IF NOT EXISTS {table}_no_{verb} BEFORE "
                         f"{verb} ON {table} BEGIN SELECT RAISE(ABORT, "
                         "'immutable review record'); END"
                     )
+            # Additive indexes for older local workspaces. Backfill one verified
+            # draft at a time; retained artifacts and their identities never change.
+            for row in connection.execute(
+                "SELECT d.id FROM drafts d LEFT JOIN draft_index i ON i.id=d.id "
+                "WHERE i.id IS NULL OR NOT EXISTS "
+                "(SELECT 1 FROM source_index s WHERE s.draft=d.id)"
+            ):
+                self._index_draft(connection, row[0], self._draft(connection, row[0]))
 
     @contextmanager
     def _connect(self):
@@ -117,6 +139,19 @@ class Workspace:
             "SELECT id FROM reports WHERE item=? ORDER BY rowid DESC LIMIT 1", (item,)
         ).fetchone()
         return row[0] if row else None
+
+    def _index_draft(self, connection, draft_id, body):
+        connection.execute(
+            "INSERT INTO draft_index VALUES (?,?,?,?,?) ON CONFLICT(id) DO NOTHING",
+            (draft_id, body["kind"], body["subject"], body["period"], bool(body["blockers"])),
+        )
+        connection.executemany(
+            "INSERT INTO source_index VALUES (?,?,?,?) ON CONFLICT(draft,role) DO NOTHING",
+            [
+                (draft_id, role, source["sha256"], source["filename"])
+                for role, source in body["sources"].items()
+            ],
+        )
 
     def prepare(self, kind, files, settings):
         # A live process retains imported code. A package update must not make
@@ -207,6 +242,7 @@ class Workspace:
             }
             sha = self._put(connection, encode(body))
             connection.execute("INSERT INTO drafts VALUES (?,?,?)", (draft_id, sha, item))
+            self._index_draft(connection, draft_id, body)
             connection.execute(
                 "INSERT INTO heads VALUES (?,?) ON CONFLICT(item) DO UPDATE "
                 "SET draft=excluded.draft",
@@ -280,13 +316,27 @@ class Workspace:
         self._history_bounds(offset, limit)
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT id FROM drafts ORDER BY rowid DESC LIMIT ? OFFSET ?", (limit, offset)
+                "SELECT d.id,i.kind,i.subject,i.period, "
+                "CASE WHEN r.id IS NOT NULL THEN 'issued' "
+                "WHEN i.blocked THEN 'blocked' "
+                "WHEN i.kind='acquisition' AND e.draft IS NULL THEN 'awaiting_execution_review' "
+                "ELSE 'awaiting_report_review' END, h.draft=d.id, r.id "
+                "FROM drafts d JOIN draft_index i ON i.id=d.id "
+                "LEFT JOIN reports r ON r.draft=d.id "
+                "LEFT JOIN executions e ON e.draft=d.id "
+                "LEFT JOIN heads h ON h.item=d.item "
+                "ORDER BY d.rowid DESC LIMIT ? OFFSET ?",
+                (limit, offset),
             ).fetchall()
             return [
                 {
-                    k: v
-                    for k, v in self._view(connection, row[0]).items()
-                    if k in {"id", "kind", "subject", "period", "status", "active", "report_id"}
+                    "id": row[0],
+                    "kind": row[1],
+                    "subject": row[2],
+                    "period": row[3],
+                    "status": row[4],
+                    "active": bool(row[5]),
+                    "report_id": row[6],
                 }
                 for row in rows
             ]
@@ -473,16 +523,19 @@ class Workspace:
         self._history_bounds(offset, limit)
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT id FROM reports ORDER BY rowid DESC LIMIT ? OFFSET ?", (limit, offset)
+                "SELECT r.id,i.kind,i.subject,i.period,r.parent,r.created_at "
+                "FROM reports r JOIN draft_index i ON i.id=r.draft "
+                "ORDER BY r.rowid DESC LIMIT ? OFFSET ?",
+                (limit, offset),
             ).fetchall()
             return [
                 {
                     "id": row[0],
-                    **{
-                        k: v
-                        for k, v in self._report(connection, row[0]).items()
-                        if k in {"kind", "subject", "period", "parent_report", "issued_at"}
-                    },
+                    "kind": row[1],
+                    "subject": row[2],
+                    "period": row[3],
+                    "parent_report": row[4],
+                    "issued_at": row[5],
                 }
                 for row in rows
             ]
@@ -490,8 +543,16 @@ class Workspace:
     def source(self, sha):
         with self._connect() as connection:
             # Only source blobs referenced by a draft are downloadable here.
-            for row in connection.execute("SELECT id FROM drafts"):
-                for source in self._draft(connection, row[0])["sources"].values():
-                    if source["sha256"] == sha:
-                        return source["filename"], self._blob(connection, sha)
+            row = connection.execute(
+                "SELECT draft,filename FROM source_index WHERE sha=? ORDER BY rowid LIMIT 1",
+                (sha,),
+            ).fetchone()
+            if row:
+                draft = self._draft(connection, row[0])
+                if not any(
+                    s["sha256"] == sha and s["filename"] == row[1]
+                    for s in draft["sources"].values()
+                ):
+                    refuse("INTEGRITY_ERROR", "Source index does not match its retained draft.")
+                return row[1], self._blob(connection, sha)
         refuse("NOT_FOUND", "Source is not part of this workspace.")

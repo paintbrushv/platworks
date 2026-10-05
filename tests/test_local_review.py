@@ -682,3 +682,82 @@ def test_json_mapping_locations_are_bounded(tmp_path, shape):
     source["dataset"] = ("synthetic-shape.json", json.dumps(data).encode())
     with pytest.raises(ReviewError, match="INPUT_LIMIT"):
         Workspace(tmp_path / "review").prepare("operations", source, settings)
+
+
+def test_history_summaries_do_not_load_artifact_blobs(tmp_path, monkeypatch):
+    workspace = Workspace(tmp_path / "review")
+    source, settings = acquisition()
+    draft = workspace.prepare("acquisition", source, settings)
+    decide(workspace, draft, "execute")
+    source, settings = operations()
+    issued = decide(workspace, workspace.prepare("operations", source, settings), "issue")
+    source, settings = operations(
+        "0.31", parent_report=issued["report_id"], correction_reason="One cent"
+    )
+    workspace.prepare("operations", source, settings)
+    drafts, reports = workspace.list_drafts(), workspace.list_reports()
+    acquisition_summary = next(row for row in drafts if row["id"] == draft["id"])
+    assert acquisition_summary["period"] is None
+    assert acquisition_summary["status"] == "awaiting_report_review"
+    assert len(drafts) == 3 and len(reports) == 1
+
+    def no_artifacts(*args):
+        raise AssertionError("History loaded a complete artifact")
+
+    monkeypatch.setattr(workspace, "_blob", no_artifacts)
+    assert workspace.list_drafts() == drafts
+    assert workspace.list_reports() == reports
+    # Opening a selection must still take the full verification path.
+    with pytest.raises(AssertionError, match="complete artifact"):
+        workspace.get(draft["id"])
+    with pytest.raises(AssertionError, match="complete artifact"):
+        workspace.report(issued["report_id"])
+
+
+@pytest.mark.parametrize("kind", ["acquisition", "operations"])
+def test_history_indexes_backfill_without_changing_retained_records(tmp_path, kind):
+    import sqlite3
+
+    workspace = Workspace(tmp_path / "review")
+    source, settings = acquisition() if kind == "acquisition" else operations()
+    draft = workspace.prepare(kind, source, settings)
+    if kind == "acquisition":
+        draft = decide(workspace, draft, "execute")
+    issued = decide(workspace, draft, "issue")
+    expected = workspace.report(issued["report_id"])
+    drafts, reports = workspace.list_drafts(), workspace.list_reports()
+    with sqlite3.connect(workspace.database) as connection:
+        before = connection.execute("SELECT sha, body FROM blobs ORDER BY sha").fetchall()
+        connection.execute("DROP TABLE IF EXISTS draft_index")
+        connection.execute("DROP TABLE IF EXISTS source_index")
+    reopened = Workspace(workspace.path)
+    with sqlite3.connect(workspace.database) as connection:
+        assert connection.execute("SELECT COUNT(*) FROM draft_index").fetchone()[0] == 1
+        assert connection.execute("SELECT COUNT(*) FROM source_index").fetchone()[0] == 1
+        assert connection.execute("SELECT sha, body FROM blobs ORDER BY sha").fetchall() == before
+    assert reopened.list_drafts() == drafts
+    assert reopened.list_reports() == reports
+    assert reopened.report(issued["report_id"]) == expected
+
+
+def test_source_download_verifies_only_the_indexed_draft(tmp_path, monkeypatch):
+    workspace = Workspace(tmp_path / "review")
+    source, settings = operations()
+    first = workspace.prepare("operations", source, settings)
+    source, settings = acquisition()
+    workspace.prepare("acquisition", source, settings)
+    wanted = first["sources"]["dataset"]["sha256"]
+    original = workspace._draft
+    inspected = []
+
+    def selected(connection, draft_id):
+        inspected.append(draft_id)
+        assert draft_id == first["id"], "Source lookup loaded an unrelated draft"
+        return original(connection, draft_id)
+
+    monkeypatch.setattr(workspace, "_draft", selected)
+    assert workspace.source(wanted)[1] == operations()[0]["dataset"][1]
+    assert inspected == [first["id"]]
+    with pytest.raises(ReviewError, match="NOT_FOUND"):
+        workspace.source("0" * 64)
+    assert inspected == [first["id"]]
