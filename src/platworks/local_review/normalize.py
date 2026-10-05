@@ -136,14 +136,27 @@ def table(raw, extension, headers, sheet_name):
 
 
 def leaves(value, pointer=""):
-    if isinstance(value, dict) and value:
-        for key, item in value.items():
-            yield from leaves(item, pointer + "/" + key.replace("~", "~0").replace("/", "~1"))
-    elif isinstance(value, list) and value:
-        for i, item in enumerate(value):
-            yield from leaves(item, f"{pointer}/{i}")
-    else:
-        yield pointer, value
+    count = locator_bytes = 0
+
+    def walk(item, location, depth):
+        nonlocal count, locator_bytes
+        if depth > 64 or len(location) > 1000:
+            refuse("INPUT_LIMIT", "JSON allows 64 levels and pointers up to 1,000 characters.")
+        if isinstance(item, dict) and item:
+            for key, child in item.items():
+                escaped = key.replace("~", "~0").replace("/", "~1")
+                yield from walk(child, location + "/" + escaped, depth + 1)
+        elif isinstance(item, list) and item:
+            for i, child in enumerate(item):
+                yield from walk(child, f"{location}/{i}", depth + 1)
+        else:
+            count += 1
+            locator_bytes += len(location.encode("utf-8"))
+            if count > 10000 or locator_bytes > 1024 * 1024:
+                refuse("INPUT_LIMIT", "JSON allows 10,000 values and 1 MiB of source locators.")
+            yield location, item
+
+    yield from walk(value, pointer, 0)
 
 
 def acquisition_input(raw, extension):
@@ -159,6 +172,8 @@ def acquisition_input(raw, extension):
         if not pointer.startswith("/") or len(pointer) > 1000 or re.search(r"~(?![01])", pointer):
             refuse("INVALID_POINTER", "Use nonempty JSON pointers with ~0/~1 escaping.")
         parts = tuple(p.replace("~1", "/").replace("~0", "~") for p in pointer[1:].split("/"))
+        if len(parts) > 64:
+            refuse("INPUT_LIMIT", "Input pointers allow at most 64 levels.")
         if any(parts[:i] in seen for i in range(1, len(parts) + 1)) or any(
             previous[: len(parts)] == parts for previous in seen
         ):

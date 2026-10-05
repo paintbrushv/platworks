@@ -135,6 +135,10 @@ and management fees. Match their exact spelling or choose an explicit mapping.
 - Each file is at most 2 MiB. Tables allow 10,000 data rows. Expanded XLSX content
   is at most 16 MiB. XLSX cells must be text, including codes and money; formulas
   and numeric/date cells are refused to avoid guessing at their meaning.
+- Canonical JSON allows 10,000 leaf values per source, 64 nesting levels, and
+  1 MiB of combined UTF-8 source locators. Empty containers count as leaf values.
+  Each JSON pointer allows 1,000 characters; table input pointers also allow at
+  most 64 levels. Inputs exceeding any limit are refused before review.
 - Canonical JSON and these standardized layouts are supported. Raw vendor rent
   rolls, T12 workbooks, scanned PDFs and arbitrary exports need a separately
   reviewed normalization step. The interface retains the selected canonical

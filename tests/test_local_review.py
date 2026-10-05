@@ -648,3 +648,37 @@ def test_csv_stops_reading_at_the_row_limit(monkeypatch):
     monkeypatch.setattr(normalize.csv, "reader", bounded_reader)
     with pytest.raises(ReviewError, match="INPUT_LIMIT"):
         normalize.table(b"header\n" + b"value\n" * 20000, "csv", ("header",), "Unused")
+
+
+@pytest.mark.parametrize("kind", ["acquisition", "operations"])
+def test_json_leaf_limit_refuses_before_saving_expanded_mappings(tmp_path, kind):
+    source, settings = acquisition() if kind == "acquisition" else operations()
+    role = "inputs" if kind == "acquisition" else "dataset"
+    data = json.loads(source[role][1])
+    if kind == "acquisition":
+        data["metadata"]["synthetic_invalid_values"] = [0] * 10001
+    else:
+        data["snapshot"] = [0] * 10001
+    raw = json.dumps(data).encode()
+    assert len(raw) < 2 * 1024 * 1024
+    source[role] = ("synthetic-oversized.json", raw)
+    workspace = Workspace(tmp_path / "review")
+    with pytest.raises(ReviewError, match="INPUT_LIMIT"):
+        workspace.prepare(kind, source, settings)
+    assert workspace.list_drafts() == []
+
+
+@pytest.mark.parametrize("shape", ["deep", "long_locators"])
+def test_json_mapping_locations_are_bounded(tmp_path, shape):
+    source, settings = operations()
+    data = json.loads(source["dataset"][1])
+    if shape == "deep":
+        value = 0
+        for _ in range(66):
+            value = {"nested": value}
+    else:
+        value = {"x" * 900: [0] * 2000}
+    data["snapshot"] = value
+    source["dataset"] = ("synthetic-shape.json", json.dumps(data).encode())
+    with pytest.raises(ReviewError, match="INPUT_LIMIT"):
+        Workspace(tmp_path / "review").prepare("operations", source, settings)
