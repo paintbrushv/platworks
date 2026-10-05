@@ -1,0 +1,44 @@
+# Deployment template only. Choose a host and build/pin the candidate image first.
+services:
+  mcp:
+    image: ${PLATWORKS_IMAGE:?Set an immutable image digest}
+    platform: linux/amd64
+    read_only: true
+    user: "65532:65532"
+    init: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 1g
+    cpus: 2
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,exec,size=256m,uid=65532,gid=65532,mode=0700
+    environment:
+      PLATWORKS_ALLOWED_HOSTS: ${MCP_DOMAIN:?Set the MCP domain}
+    networks: [calculations]
+    restart: unless-stopped
+    logging:
+      driver: none
+  proxy:
+    image: caddy:2@sha256:8dc9fa87b36b25303d1c67d2a09f5824b7f3bfd72cb052f246e5da2133fe29a8
+    ports: ["80:80", "443:443"]
+    environment:
+      MCP_DOMAIN: ${MCP_DOMAIN:?Set the MCP domain}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - certificates:/data
+      - caddy_config:/config
+    networks: [edge, calculations]
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+    logging:
+      driver: none
+networks:
+  calculations:
+    internal: true
+  edge: {}
+volumes:
+  certificates: {}
+  caddy_config: {}

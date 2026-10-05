@@ -92,6 +92,23 @@ def diagnose(analysis=False):
         lambda: importlib.import_module("platworks.mcp_server") and {},
         "Reinstall platworks and its MCP 2 dependencies.",
     )
+
+    def library_resources():
+        from platworks.library import _load
+
+        corpus, index = _load()
+        return {
+            "version": corpus["version"],
+            "references": len(corpus["references"]),
+            "corpus_sha256": index["corpus_sha256"],
+        }
+
+    check("reference_library", library_resources, "Reinstall the complete platworks wheel.")
+    check(
+        "public_mcp",
+        lambda: importlib.import_module("platworks.mcp_http") and {},
+        "Reinstall the HTTP transport dependencies.",
+    )
     if analysis:
 
         def resources():

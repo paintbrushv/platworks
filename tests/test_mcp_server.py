@@ -125,7 +125,8 @@ def test_tool_get_ecosystem_overview_matches_catalog():
     c = catalog.counts()
     assert payload["counts"] == c
     assert payload["principle"]
-    assert payload["synthetic_data_only"] is True
+    assert payload["packaged_examples_synthetic_only"] is True
+    assert payload["scenario_inputs"] == "user_supplied_unverified"
     assert set(payload["public_components"]) == {
         e["name"] for e in catalog.list_components() if e["public"]
     }
@@ -274,11 +275,13 @@ def test_stdio_end_to_end_roundtrip(tmp_path):
                 # drive every one of the eleven tools end-to-end
                 from platworks import tools as tool_registry
                 from platworks import wrappers as product_registry
+                from platworks.library_tools import COMMON_TOOLS, LOCAL_TOOLS
 
                 assert len(tools.tools) == (
                     tool_registry.TOOL_COUNT
                     + len(product_registry.PRODUCT_TOOL_NAMES)
-                ) == 19
+                    + len(COMMON_TOOLS) + len(LOCAL_TOOLS)
+                ) == 25
                 calls = {
                     "list_components": {},
                     "get_component": {"name": "geostack"},

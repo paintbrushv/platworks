@@ -1,3 +1,6 @@
 include requirements-*.lock release-sources.json
 recursive-include scripts *.py
 recursive-include docs *.md
+
+recursive-include deploy Dockerfile *.yaml Caddyfile *.md
+recursive-include integrations *.json *.md

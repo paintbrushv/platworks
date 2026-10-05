@@ -1,0 +1,482 @@
+{
+  "contract_version": "plat.library/1",
+  "version": "1.0.0",
+  "license": "Apache-2.0",
+  "authorship": "Original Platworks reference prose; linked sources retain their own rights.",
+  "sources": {
+    "occ-cre": {
+      "title": "OCC Commercial Real Estate Lending, version 2.0",
+      "url": "https://www.occ.gov/publications-and-resources/publications/comptrollers-handbook/files/commercial-real-estate-lending/pub-ch-commercial-real-estate.pdf",
+      "locator": "Debt-service coverage discussion and glossary",
+      "checked_on": "2026-10-05",
+      "check_method": "Primary document read; paraphrased context only"
+    },
+    "tx-basics": {
+      "title": "Texas Comptroller: Property Tax System Basics",
+      "url": "https://comptroller.texas.gov/taxes/property-tax/basics.php",
+      "checked_on": "2026-10-05",
+      "check_method": "Primary page read; local assessment context only"
+    },
+    "backsolve": {
+      "title": "plat-multifamily-underwriting: docs/BACKSOLVE_API.md",
+      "url": "https://github.com/paintbrushv/plat-multifamily-underwriting/blob/96dade6530ef9032c1294e41afaeb7ac8da8f1ba/docs/BACKSOLVE_API.md",
+      "commit": "96dade6530ef9032c1294e41afaeb7ac8da8f1ba",
+      "checked_on": "2026-10-05",
+      "check_method": "Pinned repository contract read"
+    },
+    "ops": {
+      "title": "plat-operations: docs/EXACT_CENTS.md",
+      "url": "https://github.com/paintbrushv/plat-operations/blob/e2c3837fcdac9fdf24bf2b397c161bf01a9e94a1/docs/EXACT_CENTS.md",
+      "commit": "e2c3837fcdac9fdf24bf2b397c161bf01a9e94a1",
+      "checked_on": "2026-10-05",
+      "check_method": "Pinned repository contract read"
+    },
+    "cost": {
+      "title": "plat-costmodel: README.md",
+      "url": "https://github.com/paintbrushv/plat-costmodel/blob/1f82087dc7db1715f44336467c50a92b16748903/README.md",
+      "commit": "1f82087dc7db1715f44336467c50a92b16748903",
+      "checked_on": "2026-10-05",
+      "check_method": "Pinned repository contract read"
+    },
+    "review": {
+      "title": "platworks: docs/local-review.md",
+      "url": "https://github.com/paintbrushv/platworks/blob/c20056493bbcc409ea25e211d86e755d7136ead5/docs/local-review.md",
+      "commit": "c20056493bbcc409ea25e211d86e755d7136ead5",
+      "checked_on": "2026-10-05",
+      "check_method": "Pinned repository contract read"
+    }
+  },
+  "references": [
+    {
+      "id": "mf.occupancy",
+      "version": "1.0.0",
+      "title": "Occupancy: units, dates and denominators",
+      "keywords": [
+        "occupancy",
+        "occupied",
+        "vacant",
+        "down",
+        "rent",
+        "roll",
+        "physical",
+        "economic"
+      ],
+      "summary": "Reconcile unit counts and dates before comparing occupancy.",
+      "body": "For an operating snapshot, occupied + vacant + down must equal unit_count. Preserve the observation date and property identifier. Physical occupancy counts occupied units; economic occupancy concerns realized revenue and requires its own stated denominator and period. Do not substitute one for the other. Ask which units are down, why, and whether the source includes them in total units. Compare like dates and scopes. A rent roll is an input requiring reconciliation, not proof that all scheduled rent was collected. The acquisition review currently requires zero down units; handle unsupported layouts through a reviewed normalization step.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "ops",
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.noi",
+      "version": "1.0.0",
+      "title": "NOI and the operating statement boundary",
+      "keywords": [
+        "NOI",
+        "net",
+        "operating",
+        "income",
+        "reserve",
+        "capex",
+        "revenue",
+        "expenses"
+      ],
+      "summary": "State the income, expense and reserve convention used for NOI.",
+      "body": "NOI summarizes property operations before financing and income tax; distinguish operating expenses from capital work, depreciation and debt payments. Lender definitions can include a reserve deduction: OCC describes an imputed replacement reserve in its NOI convention. Record the convention instead of assuming every NOI label has identical meaning. In Platworks, review account categories and the Rust producer result together. Preserve gross revenue, contra-revenue and operating expense evidence. Never move costs across the operating/capital boundary merely to meet a target. Reconcile source totals, unmapped accounts, exclusions and reporting period before using NOI for valuation or lender comparisons.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "occ-cre",
+        "ops",
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.normalization",
+      "version": "1.0.0",
+      "title": "Normalize source files with evidence",
+      "keywords": [
+        "normalization",
+        "mapping",
+        "CSV",
+        "XLSX",
+        "JSON",
+        "source",
+        "evidence",
+        "reconciliation",
+        "missing",
+        "zero"
+      ],
+      "summary": "Keep original bytes and explain every mapping into canonical inputs.",
+      "body": "Retain the original file, its hash, source period, sheet or row locator, units and signs. Document each canonical field and transformation. Distinguish missing, blank, not applicable and explicit zero. Do not silently annualize partial periods, net concessions into rent, or mix cash and accrual ledgers. Reconcile totals before and after mapping. Escalate conflicting dates, totals or assumptions to the owner; keep alternatives visible. The local review workflow retains sources and mappings and binds decisions to their hashes. An assistant extracting a value from an attachment has proposed an input; a competent person must inspect it before relying on the result.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "review",
+        "ops"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.underwriting-assumptions",
+      "version": "1.0.0",
+      "title": "Underwriting assumptions and backsolve units",
+      "keywords": [
+        "underwriting",
+        "assumptions",
+        "backsolve",
+        "policy",
+        "benchmark",
+        "cashflow",
+        "value_add",
+        "percent",
+        "fraction"
+      ],
+      "summary": "Make policy, benchmark dates and scenario inputs explicit.",
+      "body": "Keep purchase, debt, exit, hold period, rent curves, operating expenses and property-tax policy with the scenario. Backsolve uses policy version plat.backsolve-policy/1 and a stated cashflow or value_add strategy. Supply a benchmark rate, as_of date and source. In the umbrella tool, target_coc_pct=7 means 7%; a benchmark rate of 0.04 means 4%. These fields use different units. House policy defaults are product assumptions, not industry standards. Inspect effective assumptions and tested bounds in the result. An infeasible or iteration_limit status is not a solved offer price; ceiling_feasible means the configured upper bound passed. Backsolve assumes the search behaves as documented; test boundary and downside cases separately.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "backsolve",
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.property-tax",
+      "version": "1.0.0",
+      "title": "Property tax: jurisdiction and acquisition scenario",
+      "keywords": [
+        "property",
+        "tax",
+        "reassessment",
+        "assessed",
+        "value",
+        "millage",
+        "jurisdiction",
+        "Texas",
+        "tax",
+        "year"
+      ],
+      "summary": "Require a dated, jurisdiction-specific tax scenario and supporting evidence.",
+      "body": "Property tax assumptions need the property jurisdiction, tax year, assessment basis, applicable rates and acquisition or improvement facts. For example, Texas property taxation is local: appraisal districts determine values and local taxing units set rates. A prior bill alone does not establish the next ownership scenario. Preserve the bill, assessment notices and the authority used for any modeled change. The supported tax-regime calculator returns researched rules with a human-review requirement. It is not a substitute for confirming applicability to the property and year. Unsupported jurisdictions must remain unresolved; do not transplant another state’s rule. Record insurance separately from taxes even when both arrive in escrow payments.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "tx-basics",
+        "backsolve",
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.insurance",
+      "version": "1.0.0",
+      "title": "Insurance assumptions and quote comparison",
+      "keywords": [
+        "insurance",
+        "premium",
+        "deductible",
+        "exclusions",
+        "coverage",
+        "replacement",
+        "cost",
+        "quote",
+        "renewal"
+      ],
+      "summary": "Use dated coverage and premium evidence, and compare like terms.",
+      "body": "Record the quote or policy date, coverage period, named property, insured values, premium, deductibles, exclusions and material conditions. Separate recurring premium from one-time fees and avoid treating a partial payment as a full-year expense. Compare renewal and acquisition quotes with the same coverage assumptions, including catastrophe deductibles where relevant. Track open underwriting conditions and expiration dates as unanswered questions. The reference library does not supply live quotes, bind coverage or verify adequacy. A modeled premium is a scenario assumption until the owner and insurance professional confirm the evidence and scope. Preserve the original quote in the private review workspace, not in the public library.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.debt",
+      "version": "1.0.0",
+      "title": "Debt, DSCR and debt yield",
+      "keywords": [
+        "debt",
+        "DSCR",
+        "debt",
+        "service",
+        "coverage",
+        "debt",
+        "yield",
+        "amortization",
+        "interest",
+        "only",
+        "loan",
+        "sizing"
+      ],
+      "summary": "Tie debt metrics to the lender’s numerator, payment period and terms.",
+      "body": "DSCR compares the stated income measure with debt service over a matching period. Debt yield compares the stated income measure with loan principal. Neither ratio alone defines prudent leverage; cash-flow and loan risks matter. Record amortization, interest-only periods, rate basis, maturity, fees and any refinancing assumptions. An interest-only year can produce a different cash-flow profile from a fully amortizing year. Preserve lender adjustments to income and reserves so a lender ratio is not silently compared with an unadjusted model ratio. Obtain the calculation from the financial engine; inspect its inputs, cash flow and effective assumptions before interpreting the result.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "occ-cre",
+        "backsolve"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.returns",
+      "version": "1.0.0",
+      "title": "Returns: cash-on-cash, IRR and equity multiple",
+      "keywords": [
+        "returns",
+        "CoC",
+        "cash",
+        "on",
+        "cash",
+        "IRR",
+        "equity",
+        "multiple",
+        "yield",
+        "timing",
+        "exit"
+      ],
+      "summary": "Read return metrics with their timing, denominator and exit assumptions.",
+      "body": "Cash-on-cash, IRR and equity multiple answer different questions. Specify the cash-flow period, equity denominator, debt treatment and fees for each comparison. A higher multiple over a longer hold need not imply a higher annualized return. IRR depends on timing and can be unsuitable for some cash-flow patterns; retain the underlying sequence and any producer refusal. Exit valuation, selling costs and outstanding debt affect terminal equity proceeds. Compare base and downside cases with the same metric definitions. The engine owns arithmetic. An assistant may explain the result but should not reconstruct a competing financial number or call an unreviewed scenario certified.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "backsolve",
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.renovation",
+      "version": "1.0.0",
+      "title": "Renovation scopes, cost ranges and ROI policy",
+      "keywords": [
+        "renovation",
+        "capex",
+        "cost",
+        "estimate",
+        "scope",
+        "SOW",
+        "bid",
+        "ROI",
+        "rent",
+        "lift"
+      ],
+      "summary": "Keep a scope, dated cost evidence and an explicit return threshold together.",
+      "body": "The cost model returns low/high ranges from its packaged knowledge base. Treat them as planning estimates, not current contractor quotes. Record unit size, scope, finish tier, quantity and exclusions. Compare bids on matching work and investigate vague lines, omitted work and schedule assumptions. The packaged ROI calculation tests annual rent lift against the high cost estimate; its default 15% threshold is house policy, not an industry requirement. State a different threshold explicitly when appropriate. Assess downtime, execution sequence and whether the rent lift is supported by the market. Age-related flags identify matters to investigate; they do not establish that a hazard exists or provide a remediation design.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "cost",
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.account-mapping",
+      "version": "1.0.0",
+      "title": "Operating account mapping and exact cents",
+      "keywords": [
+        "account",
+        "mapping",
+        "chart",
+        "accounts",
+        "ledger",
+        "GL",
+        "exact",
+        "cents",
+        "signs",
+        "revenue",
+        "contra",
+        "revenue",
+        "expenses"
+      ],
+      "summary": "Review account categories, sign conventions and precision before calculation.",
+      "body": "Use stable account codes and preserve their original labels. Map each code to the supported operating category; explain exclusions and avoid classifying unknown accounts by guessing from their sign. In the exact-cent contract, money is a decimal string with at most two decimal places, in USD, within checked signed 64-bit cents. Expenses are positive; expense credits are negative; contra-revenue is negative. Preserve cent precision rather than passing binary floating-point approximations. Reconcile mapped totals to the original source and use the same category for an account across actual and budget. A mapping change requires fresh review before issuing a replacement report.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "ops",
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.variance",
+      "version": "1.0.0",
+      "title": "Actual versus budget: coverage and variance",
+      "keywords": [
+        "variance",
+        "actual",
+        "budget",
+        "missing",
+        "zero",
+        "favorable",
+        "unfavorable",
+        "materiality"
+      ],
+      "summary": "Missing budget is a blocker; zero budget is an explicit statement.",
+      "body": "Compare the same property, month, account scope and accounting basis. The period review requires matched actual and budget account coverage. An absent budget row is not a zero-dollar budget. Investigate one-sided rows, signs, categories and period completeness before interpreting totals. Read variance direction with the account category: a revenue shortfall and an expense overrun can both be adverse even when their arithmetic signs differ. Set a dated materiality policy and retain explanations and evidence for material exceptions. A threshold selects questions for review; it does not establish that an unexplained variance is acceptable. Use the Rust period review for coverage and exact-cent arithmetic.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "ops",
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.month-close",
+      "version": "1.0.0",
+      "title": "Monthly owner review and human issue decision",
+      "keywords": [
+        "month",
+        "close",
+        "operations",
+        "monthly",
+        "review",
+        "approval",
+        "owner",
+        "questions",
+        "report",
+        "issue"
+      ],
+      "summary": "Reconcile evidence, inspect exceptions, then make a separate issue decision.",
+      "body": "Identify one property and reporting month. Gather actuals, budget and a dated occupancy snapshot. Review source provenance, account mappings, coverage, reconciliation and materiality. Run the operating preview, inspect exact-cent results and document owner questions with evidence. Resolve blockers or retain them explicitly as unresolved. In the local workflow, calculation authorization and the report issue decision are separate actions bound to the reviewed artifacts. The MCP scenario tools never issue an approved report. Reviewer names in the local workspace are OS-account attestations, not authenticated organizational identities or a substitute for separation of duties.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "ops",
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.corrections",
+      "version": "1.0.0",
+      "title": "Correct an issued report without rewriting history",
+      "keywords": [
+        "correction",
+        "supersedes",
+        "revision",
+        "immutable",
+        "original",
+        "report",
+        "change",
+        "bridge",
+        "audit"
+      ],
+      "summary": "Link a correction to the current issued report and explain the change.",
+      "body": "Preserve the original issued report and source bytes. Start a correction from the current report, identify the reason, update the affected evidence or mappings, and inspect the change bridge. A stale parent cannot silently replace a newer report. Recalculate and obtain fresh decisions for the changed input, mapping, policy and result identities. Repeated clicks must not create conflicting reports. Record whether the change affects only presentation, a source fact, a policy assumption or financial results. Keep the original and corrected conclusions available so owners can understand what changed and why.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "ops",
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.original-thesis",
+      "version": "1.0.0",
+      "title": "Original thesis versus current performance",
+      "keywords": [
+        "original",
+        "thesis",
+        "acquisition",
+        "budget",
+        "operations",
+        "compare",
+        "downside",
+        "underwriting",
+        "freeze"
+      ],
+      "summary": "Freeze the reviewed acquisition thesis before later performance comparisons.",
+      "body": "Preserve the original acquisition inputs, base/downside results, policy and decision evidence as an immutable thesis. Compare later operations on matching definitions and periods. Explain differences caused by timing, accounting treatment, new facts or revised assumptions separately from execution performance. Do not overwrite the original thesis with a current forecast. A budget can differ from the acquisition thesis; label both and document the bridge. The local acquisition workflow freezes a thesis only after a separate decision on inspected results. An MCP scenario calculation does not establish an approved thesis.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    },
+    {
+      "id": "mf.attachments",
+      "version": "1.0.0",
+      "title": "Use references with your own attachments",
+      "keywords": [
+        "attachments",
+        "private",
+        "files",
+        "assistant",
+        "ChatGPT",
+        "Claude",
+        "Grok",
+        "Muse",
+        "source",
+        "unverified",
+        "scenario"
+      ],
+      "summary": "Keep library citations, extracted facts and human decisions distinguishable.",
+      "body": "Search the public library for methods, then retrieve the exact reference ID and version. Ask the assistant to identify values from your attachment with page, sheet or row locators and to list missing or conflicting facts before calculation. Confirm units, dates, signs and assumptions. Send only the structured scenario fields needed by a remote tool: those fields leave the assistant host and reach the MCP operator. Local stdio tools can read only explicitly configured source aliases through the source-reading tools; the legacy local ops_review also accepts a local database path. The public profile exposes neither capability. Returned values are unverified scenarios with no human approval. Use the separate local review workflow for evidence retention and decisions. Host attachment processing and retention follow that host’s settings; the library cannot override them.",
+      "applicability": "US multifamily owner and asset-manager workflows; apply the stated jurisdiction, period and product contract.",
+      "source_ids": [
+        "review"
+      ],
+      "review": {
+        "checked_on": "2026-10-05",
+        "method": "Editorial source and pinned product-contract check; no independent subject-matter sign-off.",
+        "independent_domain_review": "pending"
+      }
+    }
+  ]
+}

@@ -240,15 +240,17 @@ def test_wrappers_module_exposes_eight_product_tools():
     assert not (expected & set(tools.TOOL_NAMES))
 
 
-def test_registry_and_server_agree_on_nineteen_tools():
+def test_registry_and_server_agree_on_local_tools():
     from platworks import tools, wrappers
+    from platworks.library_tools import COMMON_TOOLS, LOCAL_TOOLS
 
     assert tools.TOOL_COUNT == 11
     assert len(wrappers.PRODUCT_TOOL_NAMES) == 8
     registered = _run(_server().list_tools())
     names = {t.name for t in registered}
-    assert names == set(tools.TOOL_NAMES) | wrappers.PRODUCT_TOOL_NAMES
-    assert len(registered) == len(names) == 19
+    assert names == (set(tools.TOOL_NAMES) | wrappers.PRODUCT_TOOL_NAMES
+                     | COMMON_TOOLS | LOCAL_TOOLS)
+    assert len(registered) == len(names) == 25
 
 
 def test_product_tool_purposes_surface_in_descriptions():
@@ -676,7 +678,6 @@ def test_ops_review_with_oracle_bound_reports_variance():
         "materiality": {"variance_abs": "500.00", "currency": "USD"},
         "as_of_date": "2026-04-30",
         "db_path": _ops_snapshot_path(),
-        "variance_oracle_callable": oracle,
     }))
     assert payload["status"] == "reviewed"
     variance = payload["variance"]
@@ -813,7 +814,7 @@ def test_stdio_end_to_end_product_tools():
                 await session.initialize()
                 listed = await session.list_tools()
                 names = {t.name for t in listed.tools}
-                assert len(names) == 19
+                assert len(names) == 25
                 assert "underwrite_run" in names
                 assert "tax_regime_lookup" in names
                 assert "renovation_roi" in names

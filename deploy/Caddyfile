@@ -1,0 +1,27 @@
+{
+    # No request/access logs or payload-bearing error logs.
+    log default {
+        output discard
+    }
+    servers {
+        timeouts {
+            read_header 5s
+            read_body 10s
+            write 75s
+            idle 15s
+        }
+    }
+}
+{$MCP_DOMAIN} {
+    request_body {
+        max_size 2MB
+    }
+    header Cache-Control "no-store"
+    reverse_proxy mcp:8000 {
+        # The application trusts only the configured exact authority.
+        header_up Host {$MCP_DOMAIN}
+        transport http {
+            response_header_timeout 70s
+        }
+    }
+}

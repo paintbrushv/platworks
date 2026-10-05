@@ -35,7 +35,7 @@ Design rules (mirroring the MCP server's):
 PRODUCT_TOOL_SPECS = (
     ("underwrite_run",
      "Run the deterministic underwriting engine on a canonical deal; "
-     "certified metrics come from the engine, never a model"),
+     "scenario metrics come from the engine; source facts remain unverified"),
     ("underwrite_backsolve",
      "Backsolve the highest price meeting a target Year-1 post-debt "
      "cash-on-cash return, via the engine's own search"),

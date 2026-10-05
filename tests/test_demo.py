@@ -90,11 +90,11 @@ def test_demo_script_runs_end_to_end_over_stdio(tmp_path):
     stdout = result.stdout
     # the demo drove the real MCP server over stdio
     assert "connected to platworks MCP server" in stdout
-    assert "19 tools available" in stdout
+    assert "25 tools available" in stdout
     # and exercised the full product surface end to end
     for marker in ("=== overview ===", "=== categories ===", "=== catalog ===",
                    "=== install ===", "=== landing page ===",
-                   "every MCP tool exercised once"):
+                   "every catalog tool exercised once"):
         assert marker in stdout, marker
     # the synthetic portfolio came from the server's own tool
     assert "get_demo_portfolio" not in stdout or True  # tool name not printed

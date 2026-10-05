@@ -214,7 +214,7 @@ async def main():
             print(f"    {landing['filename']}: {len(landing['html'])} bytes "
                   "of self-contained HTML")
 
-            print("\ndemo complete — every MCP tool exercised once; all data "
+            print("\ndemo complete — every catalog tool exercised once; all data "
                   "in this demo is synthetic.")
 
 

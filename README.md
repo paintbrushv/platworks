@@ -71,7 +71,7 @@ This is an unpublished candidate.
 
 The `platworks-mcp` console script (or `python -m platworks.mcp_server`) runs an MCP
 stdio server exposing the verified catalog and the package's own product surface as
-eleven read-only tools:
+eleven catalog tools:
 
 | Tool | What it does |
 |---|---|
@@ -93,7 +93,7 @@ service computed them, with a provenance record on every response:
 
 | Tool | What it does |
 |---|---|
-| `underwrite_run` | Run the deterministic underwriting engine on a canonical deal; certified metrics verbatim |
+| `underwrite_run` | Run the deterministic underwriting engine on a canonical deal; unverified scenario metrics verbatim |
 | `underwrite_backsolve` | Backsolve the highest purchase price meeting a target Year-1 post-debt CoC |
 | `tax_regime_lookup` | Researched, statute-cited property-tax regime schedules (TX CA FL AL; unknown states refuse) |
 | `renovation_estimate` | Per-unit renovation cost ranges with line items and age-based risk flags |
@@ -104,12 +104,26 @@ service computed them, with a provenance record on every response:
 
 The product tools import their sibling services lazily: the catalog server keeps
 working without them installed, and each product tool refuses with a typed
-`BACKEND_UNAVAILABLE` payload naming the missing service.
+`BACKEND_UNAVAILABLE` payload when analysis dependencies are missing.
 
 Failures are typed refusals inside the payload
 (`{"error": {"type": ..., "message": ...}}`) naming the valid options, never opaque
-crashes. The tool list is declared once in `platworks.tools` and the server, landing
-page, and tests all derive from it. Wire it into any MCP client:
+crashes. The catalog registry, product registry and library tools define the server.
+
+Six additional tools provide `search_library`, `get_reference`,
+`get_synthetic_example`, `preview_operations`, `list_local_sources` and
+`read_local_source`. This gives **25 local tools**. The **22-tool public profile**
+excludes `ops_review` and both local source tools. All scenario results identify
+unverified inputs, producer versions and hashes; no MCP tool grants approval.
+
+The [reference library](docs/reference-library.md) packages 15 original references
+with dated source checks; independent domain review is pending. See
+[assistant setup and attachment acceptance](docs/assistant-integrations.md) for
+ChatGPT, Claude, Grok.com and Muse.ai status, and [deployment files](deploy/README.md)
+for the stateless HTTP container. Hosting will be chosen later; no public endpoint
+or working consumer-host integration is claimed yet.
+
+Wire the installed local server into an MCP client:
 
 ```json
 {
@@ -145,7 +159,7 @@ platworks demo ./demo && python demo/run_demo.py
 
 The demo writes a **synthetic** three-property portfolio (fabricated names, cities,
 and numbers) and an executable script that starts the real MCP server over stdio,
-connects as a genuine MCP client, and exercises all eleven tools end to end:
+connects as a genuine MCP client, and exercises all eleven catalog tools end to end:
 ecosystem overview, category vocabulary, catalog browsing, keyword search, the
 install instructions, the served portfolio, the landing page, and each asset's
 component mapping resolved against the verified catalog.
@@ -155,7 +169,7 @@ component mapping resolved against the verified catalog.
 `platworks landing` renders a single self-contained HTML file — inline CSS, no CDN,
 no scripts, no tracking — from the live catalog and tool registry: public components
 with their verified repository links, private components honestly marked private,
-the eleven MCP tools the server ships, and copy-paste install instructions.
+the eleven catalog tools, and copy-paste install instructions.
 
 ## Honest scope
 
