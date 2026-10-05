@@ -80,11 +80,21 @@ def verify(output):
                     page.locator("#example").click()
                     expect(page.locator("#message")).to_contain_text("Synthetic example loaded")
                     source = example("operations")["files"]["dataset"]
-                    raw = base64.b64decode(source["data_base64"])
+                    data = json.loads(base64.b64decode(source["data_base64"]))
+                    for role in ("actuals", "budgets"):
+                        data[role][0].update(account_code=" 4000 ", category="vendor rent label")
+                    raw = json.dumps(data).encode()
                     inputs = work / source["filename"]
                     inputs.write_bytes(raw)
                     page.locator("#dataset-file").set_input_files(inputs)
                     expect(page.locator("#source-selection")).to_contain_text(source["filename"])
+                    page.locator("#prepare-button").click()
+                    expect(page.locator("#draft-status")).to_contain_text("blocked")
+                    expect(page.locator("#decision-button")).to_be_disabled()
+                    page.locator("#mapping-controls select").first.select_option("rental income")
+                    page.locator("#mapping-note").fill(
+                        "Synthetic reviewer resolved padded rent code"
+                    )
                     page.locator("#prepare-button").click()
                     expect(page.locator("#draft-status")).to_contain_text("awaiting report review")
                     expect(page.locator("#result-summary")).to_contain_text("0.01")
@@ -169,6 +179,7 @@ def verify(output):
             "linked_correction",
             "mobile_layout",
             "history_pagination",
+            "padded_account_mapping",
         ],
     }
 

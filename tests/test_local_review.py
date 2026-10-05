@@ -612,3 +612,39 @@ def test_history_pages_keep_older_reports_reachable(tmp_path):
     )
     assert workspace.list_drafts(offset=1, limit=1)[0]["id"] == first["id"]
     assert workspace.get(first["id"])["status"] == "issued"
+
+
+def test_padded_account_codes_can_be_mapped_through_review(tmp_path):
+    source, settings = operations()
+    data = json.loads(source["dataset"][1])
+    for role in ("actuals", "budgets"):
+        data[role][0].update(account_code=" 4000 ", category="unknown export label")
+    raw = json.dumps(data).encode()
+    source["dataset"] = ("padded.json", raw)
+    workspace = Workspace(tmp_path / "review")
+    draft = workspace.prepare("operations", source, settings)
+    # The browser derives its mapping key from this normalized code.
+    code = draft["normalized"]["actuals"][0]["account_code"]
+    settings.update(account_mapping={code: "rental income"}, mapping_note="Reviewed rent account")
+    corrected = workspace.prepare("operations", source, settings)
+    assert not corrected["blockers"]
+    assert corrected["normalized"]["actuals"][0]["account_code"] == "4000"
+    report = workspace.report(decide(workspace, corrected, "issue")["report_id"])
+    assert report["result"]["variance"]["noi_bridge"]["noi_variance"] == "0.01"
+    assert workspace.source(report["sources"]["dataset"]["sha256"])[1] == raw
+
+
+def test_csv_stops_reading_at_the_row_limit(monkeypatch):
+    from platworks.local_review import normalize
+
+    real_reader = normalize.csv.reader
+
+    def bounded_reader(*args, **kwargs):
+        for count, row in enumerate(real_reader(*args, **kwargs), 1):
+            if count > 10002:
+                raise AssertionError("Reader consumed records beyond the rejection boundary")
+            yield row
+
+    monkeypatch.setattr(normalize.csv, "reader", bounded_reader)
+    with pytest.raises(ReviewError, match="INPUT_LIMIT"):
+        normalize.table(b"header\n" + b"value\n" * 20000, "csv", ("header",), "Unused")

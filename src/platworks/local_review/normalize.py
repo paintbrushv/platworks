@@ -85,7 +85,11 @@ def sources(files):
 def table(raw, extension, headers, sheet_name):
     if extension == "csv":
         try:
-            rows = list(csv.reader(io.StringIO(raw.decode("utf-8-sig")), strict=True))
+            rows = []
+            for row in csv.reader(io.StringIO(raw.decode("utf-8-sig")), strict=True):
+                if len(rows) >= 10001:
+                    refuse("INPUT_LIMIT", "At most 10,000 source rows are supported.")
+                rows.append(row)
         except (UnicodeError, csv.Error):
             refuse("UNSUPPORTED_LAYOUT", "Use a UTF-8 CSV with the documented header.")
     elif extension == "xlsx":
@@ -480,6 +484,7 @@ def normalize(kind, files, settings):
             }:
                 refuse("INVALID_INPUT", "Invalid GL row shape.")
             code = text(row["account_code"], "account code", limit=64)
+            row["account_code"] = code
             codes.add(code)
             if code in mapping and mapping[code] != row["category"]:
                 row["category"] = mapping[code]
