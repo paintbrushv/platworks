@@ -4,3 +4,5 @@
 @media(max-width:650px){header{padding:18px}.local{display:none}.shell{display:flex;flex-direction:column}aside{border-right:0;border-bottom:1px solid #d9ded5;padding:18px;min-height:0}aside h2{margin:16px 0 8px}.aside-note{display:none}main{padding:24px 16px}.panel{padding:20px 16px}.grid,.grid.three,.grid.four{grid-template-columns:1fr;gap:0}.wordmark span{font-size:13px}h1{font-size:30px}.source{align-items:flex-start;flex-direction:column}}
 
 .account-variance{min-width:520px}
+
+.history-nav{display:flex;gap:8px}.history-nav button{text-align:center}

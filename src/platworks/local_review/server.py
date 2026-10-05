@@ -80,10 +80,21 @@ def create_handler(workspace, token):
             params = parse_qs(split.query, strict_parsing=True)
             if self.command == "GET":
                 if path == "/api/state":
+                    offset = int(params.get("offset", ["0"])[0])
+                    limit = int(params.get("limit", ["100"])[0])
+                    if offset < 0 or not 1 <= limit <= 100:
+                        refuse("INVALID_INPUT", "Use a nonnegative offset and page size of 1–100.")
+                    drafts = workspace.list_drafts(offset=offset, limit=limit + 1)
+                    reports = workspace.list_reports(offset=offset, limit=limit + 1)
                     value = {
-                        "drafts": workspace.list_drafts(),
-                        "reports": workspace.list_reports(),
+                        "drafts": drafts[:limit],
+                        "reports": reports[:limit],
                         "categories": CATEGORIES,
+                        "history": {
+                            "offset": offset,
+                            "page_size": limit,
+                            "has_more": len(drafts) > limit or len(reports) > limit,
+                        },
                     }
                 elif path == "/api/draft":
                     value = workspace.get(params["id"][0])

@@ -106,3 +106,22 @@ def test_handler_operations_has_no_implicit_approval(tmp_path):
     issued = json.loads(raw)
     assert issued["report_id"]
     assert dispatch(handler, "POST", "/api/issue", decision)[0] == 200
+
+
+def test_handler_history_pagination_and_bounds(tmp_path):
+    handler = create_handler(tmp_path / "review", "synthetic-test-capability")
+    _, _, raw = dispatch(handler, "GET", "/api/example?kind=operations")
+    example = json.loads(raw)
+    for revision in ("first", "second"):
+        example["settings"]["policy_note"] = "Synthetic " + revision
+        assert dispatch(handler, "POST", "/api/prepare", example)[0] == 200
+    status, _, raw = dispatch(handler, "GET", "/api/state?limit=1")
+    newest = json.loads(raw)
+    assert status == 200 and newest["history"]["has_more"] is True
+    status, _, raw = dispatch(handler, "GET", "/api/state?limit=1&offset=1")
+    older = json.loads(raw)
+    assert status == 200 and older["history"]["has_more"] is False
+    assert older["drafts"][0]["id"] != newest["drafts"][0]["id"]
+    assert dispatch(handler, "GET", "/api/draft?id=" + older["drafts"][0]["id"])[0] == 200
+    for query in ("offset=-1", "limit=101", "limit=0"):
+        assert dispatch(handler, "GET", "/api/state?" + query)[0] == 409

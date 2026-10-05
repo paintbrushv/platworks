@@ -271,10 +271,16 @@ class Workspace:
         value["producer_current"] = producers.producer_identity() == value["producer_identity"]
         return value
 
-    def list_drafts(self):
+    @staticmethod
+    def _history_bounds(offset, limit):
+        if type(offset) is not int or offset < 0 or type(limit) is not int or not 1 <= limit <= 101:
+            refuse("INVALID_INPUT", "Use a nonnegative history offset and a bounded page size.")
+
+    def list_drafts(self, *, offset=0, limit=100):
+        self._history_bounds(offset, limit)
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT id FROM drafts ORDER BY rowid DESC LIMIT 100"
+                "SELECT id FROM drafts ORDER BY rowid DESC LIMIT ? OFFSET ?", (limit, offset)
             ).fetchall()
             return [
                 {
@@ -463,10 +469,11 @@ class Workspace:
         with self._connect() as connection:
             return self._report(connection, report_id)
 
-    def list_reports(self):
+    def list_reports(self, *, offset=0, limit=100):
+        self._history_bounds(offset, limit)
         with self._connect() as connection:
             rows = connection.execute(
-                "SELECT id FROM reports ORDER BY rowid DESC LIMIT 100"
+                "SELECT id FROM reports ORDER BY rowid DESC LIMIT ? OFFSET ?", (limit, offset)
             ).fetchall()
             return [
                 {

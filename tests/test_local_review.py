@@ -592,3 +592,23 @@ def test_xlsx_underreported_dimensions_cannot_hide_gl_rows(tmp_path):
     assert not draft["blockers"]
     assert draft["result"]["variance"]["noi_bridge"]["noi_variance"] == "0.01"
     assert len(draft["normalized"]["actuals"]) == 2
+
+
+def test_history_pages_keep_older_reports_reachable(tmp_path):
+    workspace = Workspace(tmp_path / "review")
+    first = decide(workspace, workspace.prepare("operations", *operations()), "issue")
+    revised = workspace.prepare(
+        "operations",
+        *operations(
+            "0.31", parent_report=first["report_id"], correction_reason="Synthetic correction"
+        ),
+    )
+    second = decide(workspace, revised, "issue")
+    assert workspace.list_reports(offset=0, limit=1)[0]["id"] == second["report_id"]
+    older = workspace.list_reports(offset=1, limit=1)
+    assert older[0]["id"] == first["report_id"]
+    assert (
+        workspace.report(older[0]["id"])["result"]["variance"]["noi_bridge"]["actual_noi"] == "0.30"
+    )
+    assert workspace.list_drafts(offset=1, limit=1)[0]["id"] == first["id"]
+    assert workspace.get(first["id"])["status"] == "issued"

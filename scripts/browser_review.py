@@ -11,6 +11,7 @@ from playwright.sync_api import expect, sync_playwright
 
 from platworks.local_review.examples import example
 from platworks.local_review.server import create_server
+from platworks.local_review.store import Workspace
 
 
 def verify(output):
@@ -117,6 +118,36 @@ def verify(output):
                     page.set_viewport_size({"width": 390, "height": 844})
                     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
                     page.screenshot(path=str(output / "mobile.png"), full_page=True)
+                    # Seed unapproved synthetic drafts through the actual workspace API.
+                    # Older issued history must remain reachable beyond the first 100 rows.
+                    seed = example("acquisition")
+                    source = seed["files"]["inputs"]
+                    data = json.loads(base64.b64decode(source["data_base64"]))
+                    data["metadata"]["deal_id"] = "SYN-PAGINATION"
+                    selected = {"inputs": ("synthetic-pagination.json", json.dumps(data).encode())}
+                    workspace = Workspace(work / "review")
+                    for index in range(101):
+                        seed["settings"]["policy_note"] = f"Synthetic history test {index}"
+                        workspace.prepare("acquisition", selected, seed["settings"])
+                    page.reload()
+                    expect(page.locator("#history-older")).to_be_enabled()
+                    page.locator("#history-older").click()
+                    expect(page.locator("#history-page")).to_have_text("History page 2")
+                    page.locator("#draft-list button").filter(has_text="PW-SYN-001").first.click()
+                    expect(page.locator("#issued")).to_be_visible()
+                    assert report()["kind"] == "acquisition"
+                    page.locator("#draft-list button").filter(
+                        has_text="synthetic-ops"
+                    ).first.click()
+                    expect(page.locator("#issued")).to_be_visible()
+                    expect(page.locator("#parent-report")).to_have_value(
+                        correction["parent_report"]
+                    )
+                    page.locator("#history-newer").click()
+                    expect(page.locator("#history-page")).to_have_text("History page 1")
+                    expect(page.locator("#parent-report")).to_have_value(
+                        correction["parent_report"]
+                    )
                     assert not errors, errors
                 finally:
                     browser.close()
@@ -137,6 +168,7 @@ def verify(output):
             "operating_report",
             "linked_correction",
             "mobile_layout",
+            "history_pagination",
         ],
     }
 

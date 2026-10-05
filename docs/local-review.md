@@ -11,7 +11,8 @@ platworks review ./my-review-workspace
 ```
 
 Keep the printed session link private. Use `--no-open` to open it yourself, and
-Ctrl-C to stop the server. Reopen the same workspace to resume. Use a directory
+Ctrl-C to stop the server. Reopen the same workspace to resume. Use **Older**
+and **Newer** in the history panel to reach records beyond the latest 100. Use a directory
 outside a source repository or shared/cloud-synced folder for private files.
 The analysis profile is required. A catalog-only install cannot calculate.
 

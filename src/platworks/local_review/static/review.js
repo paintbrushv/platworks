@@ -2,7 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const token = location.hash.slice(1) || sessionStorage.getItem("plat-review-session");
 if (location.hash) { sessionStorage.setItem("plat-review-session", token); history.replaceState(null, "", "/"); }
-let selected = {}, current = null, reports = [], categories = [], dirty = false, working = false, fileReads = 0;
+let selected = {}, current = null, reports = [], categories = [], dirty = false, working = false, fileReads = 0, historyOffset = 0, historyMore = false;
 const policyFields = ["data_class", "preparer", "policy_id", "policy_version", "policy_date", "policy_note", "unit_use_note", "reconciliation_note"];
 const deltas = ["rent_growth_delta_bps", "exit_cap_delta_bps", "vacancy_delta_bps", "opex_growth_delta_bps"];
 const idFor = (name) => name.replaceAll("_", "-");
@@ -27,6 +27,7 @@ async function download(path, name) {
 function controls() {
   for (const el of document.querySelectorAll("input, select, textarea, button")) el.disabled = working || fileReads > 0;
   if (current) decisionState();
+  historyState();
 }
 async function busy(button, work) {
   if (working || fileReads) return;
@@ -47,12 +48,18 @@ function chosenSources() {
   $("source-selection").textContent = Object.entries(selected).map(([role, item]) =>
     `${labelFor(role)}: ${item.filename || "retained source snapshot"}`).join(" · ");
 }
+function selectParent(parent) {
+  if (parent && ![...$("parent-report").options].some((o) => o.value === parent)) {
+    $("parent-report").add(new Option("Retained parent · " + parent.slice(0, 10), parent));
+  }
+  $("parent-report").value = parent || "";
+}
 function setSettings(settings) {
   for (const name of policyFields) $(idFor(name)).value = settings[name] || "";
   $("expected-units").value = settings.expected_units ?? ""; $("down-units").value = settings.down_units ?? "";
   for (const name of deltas) $(name).value = settings.downside?.[name] ?? "";
   for (const name of ["property", "period", "unit_count", "mapping_note", "correction_reason"]) $(idFor(name)).value = settings[name] ?? "";
-  $("parent-report").value = settings.parent_report || "";
+  selectParent(settings.parent_report);
 }
 function settings() {
   const data = Object.fromEntries(policyFields.map((name) => [name, $(idFor(name)).value]));
@@ -66,16 +73,23 @@ function settings() {
   }
   return data;
 }
-async function refreshHistory() {
-  const state = await api("/api/state"); reports = state.reports; categories = state.categories;
+function historyState() {
+  $("history-newer").disabled = working || fileReads > 0 || historyOffset === 0;
+  $("history-older").disabled = working || fileReads > 0 || !historyMore;
+}
+async function refreshHistory(reset = true) {
+  if (reset) historyOffset = 0;
+  const state = await api("/api/state?offset=" + historyOffset);
+  historyMore = state.history.has_more;
+  $("history-page").textContent = "History page " + (Math.floor(historyOffset / 100) + 1); reports = state.reports; categories = state.categories;
   $("draft-list").replaceChildren(); $("report-list").replaceChildren();
-  if (!state.drafts.length) $("draft-list").append(node("p", "No drafts yet.", "muted"));
+  if (!state.drafts.length) $("draft-list").append(node("p", (historyOffset ? "No drafts on this page." : "No drafts yet."), "muted"));
   for (const draft of state.drafts) {
     const button = node("button", draft.subject + (draft.period ? " · " + draft.period : ""), "history");
     button.append(node("small", labelFor(draft.status) + (draft.active ? "" : " · prior draft")));
     button.onclick = () => busy(button, async () => show(await api("/api/draft?id=" + draft.id), true)); $("draft-list").append(button);
   }
-  if (!reports.length) $("report-list").append(node("p", "Reports appear after review.", "muted"));
+  if (!reports.length) $("report-list").append(node("p", (historyOffset ? "No reports on this page." : "Reports appear after review."), "muted"));
   const parent = $("parent-report").value; $("parent-report").replaceChildren(new Option("New period / no parent", ""));
   for (const report of reports) {
     const button = node("button", report.subject + (report.period ? " · " + report.period : " · original thesis"), "history");
@@ -84,7 +98,8 @@ async function refreshHistory() {
     $("report-list").append(button);
     if (report.kind === "operations") $("parent-report").add(new Option(report.subject + " · " + report.period + " · " + report.id.slice(0, 10), report.id));
   }
-  $("parent-report").value = parent;
+  selectParent(parent);
+  historyState();
 }
 function summaryTable(title, values, target) {
   target.append(node("h3", title)); const table = node("table"), tbody = node("tbody");
@@ -210,4 +225,6 @@ $("example").onclick = () => busy($("example"), async () => {
   message("Synthetic example loaded. Review the settings, prepare the draft, and make each decision yourself.");
 });
 $("new-draft").onclick = () => { $("prepare-form").reset(); current = null; selected = {}; $("review-panel").hidden = true; $("message").hidden = true; $("mapping-controls").replaceChildren(); $("prepare-button").textContent = "Prepare draft"; layout(); chosenSources(); window.scrollTo({top: 0, behavior: "smooth"}); };
+$("history-newer").onclick = () => busy($("history-newer"), async () => { historyOffset = Math.max(0, historyOffset - 100); await refreshHistory(false); });
+$("history-older").onclick = () => busy($("history-older"), async () => { historyOffset += 100; await refreshHistory(false); });
 layout(); refreshHistory().catch((error) => message(error.message, true));
