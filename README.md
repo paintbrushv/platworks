@@ -49,6 +49,24 @@ A catalog-only install omits the `analysis` extra. `platworks doctor` checks tha
 lighter profile. Financial tools require the analysis producers; see
 [financial contracts](docs/financial-core.md).
 
+## Review acquisition and operating files
+
+The analysis candidate includes a local browser workflow:
+
+```bash
+platworks review ./my-review-workspace
+```
+
+Review source mappings and assumptions, authorize acquisition base/downside
+calculations, and separately freeze the original thesis. For operations, review
+the exact-cent NOI bridge and issue an immutable report; later corrections link
+to that report and retain its history. Each decision binds the exact files,
+policy, mappings and producer identities. No MCP tool grants approval.
+
+See [supported file layouts and walkthroughs](docs/local-review.md). Initial
+support covers canonical JSON and standardized CSV/XLSX. Synthetic browser checks pass; independent-user pilots remain pending.
+This is an unpublished candidate.
+
 ## The MCP server
 
 The `platworks-mcp` console script (or `python -m platworks.mcp_server`) runs an MCP
@@ -113,6 +131,7 @@ platworks get plat-harness        # one component
 platworks demo                    # write the synthetic demo to ./platworks-demo
 platworks landing                 # render landing.html (standalone, no external assets)
 platworks mcp                     # run the MCP stdio server
+platworks review ./review         # open the local human review workspace
 ```
 
 Exit codes are stable: `0` success, `2` typed refusal (unknown component/category)
@@ -147,8 +166,8 @@ the eleven MCP tools the server ships, and copy-paste install instructions.
   this package or its demo.
 - **Private components make no public claims.** No repo URLs, no descriptions —
   for private entries the catalog returns `null` and says so.
-- **No network calls at runtime.** The MCP server, CLI, and landing generator read
-  the packaged catalog only.
+- **Local execution.** The catalog and financial tools use packaged resources and
+  installed producers. The review UI uses loopback HTTP and keeps files locally.
 
 ## Layout
 

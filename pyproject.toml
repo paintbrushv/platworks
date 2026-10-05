@@ -44,6 +44,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 platworks = ["data/*.json"]
+"platworks.local_review" = ["static/*.html", "static/*.js", "static/*.css"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -47,6 +47,7 @@ def verify():
     assert report["status"] in {"ready", "ready_with_warnings"}, "Doctor failed"
     from engine.backsolve import backsolve_price
 
+    from platworks.local_review.smoke import verify as verify_local_workflows
     from platworks.wrappers import ops_review, underwrite_backsolve, underwrite_run
 
     inputs = json.loads(files("platworks").joinpath("data/synthetic_acquisition.json").read_text())
@@ -154,6 +155,7 @@ def verify():
         "status": "passed",
         "data_class": "synthetic",
         "doctor": report,
+        "local_review": verify_local_workflows(),
         "checks": [
             "acquisition",
             "backsolve_api_wrapper_mcp_parity",

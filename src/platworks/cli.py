@@ -10,6 +10,7 @@ Rules:
 """
 
 import json
+from pathlib import Path
 
 import click
 
@@ -40,8 +41,7 @@ def catalog_list(category, as_json):
     """List ecosystem components (verified catalog)."""
     if category is not None and category not in catalog.CATEGORIES:
         click.echo(
-            f"unknown category: {category}; valid categories: "
-            + ", ".join(catalog.CATEGORIES),
+            f"unknown category: {category}; valid categories: " + ", ".join(catalog.CATEGORIES),
             err=True,
         )
         raise SystemExit(2)
@@ -94,6 +94,45 @@ def mcp():
     from platworks import mcp_server
 
     mcp_server.main()
+
+
+@main.command()
+@click.argument("workspace", type=click.Path(path_type=Path))
+@click.option(
+    "--no-open", is_flag=True, help="Print the local session link without opening a browser."
+)
+@click.option(
+    "--port", type=click.IntRange(0, 65535), default=0, help="Local port; 0 chooses a free port."
+)
+def review(workspace, no_open, port):
+    """Review acquisition and operations files in a private local WORKSPACE."""
+    import webbrowser
+
+    from platworks.local_review.common import ReviewError
+    from platworks.local_review.server import create_server
+
+    try:
+        server, token = create_server(workspace, port=port)
+    except (ReviewError, OSError) as error:
+        click.echo(
+            error.message
+            if isinstance(error, ReviewError)
+            else "Cannot open the local review workspace or port.",
+            err=True,
+        )
+        raise SystemExit(2) from None
+    link = f"http://127.0.0.1:{server.server_port}/#{token}"
+    click.echo("Private local review. Keep this session link on this computer:")
+    click.echo(link)
+    click.echo("Press Ctrl-C to close. Reopen the same workspace to resume.")
+    if not no_open:
+        webbrowser.open(link)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
 
 
 @main.command()

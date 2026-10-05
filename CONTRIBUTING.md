@@ -25,6 +25,13 @@ pytest                    # full suite including stdio end-to-end tests
 
 Style: ruff (`line-length = 100`, `target-version = py311`); imports sorted.
 
+Financial/local-review tests require the candidate analysis wheels described in
+[installation](docs/installation.md). `tests/test_local_review_http.py` uses real
+loopback sockets. Run `python scripts/browser_review.py --output browser-evidence`
+with Playwright and Chromium installed for the synthetic browser journeys. CI
+runs that script against installed wheels and retains its screenshots and result.
+Browser automation is not an independent human pilot; retain that acceptance gap.
+
 Tests import the installed package, including in subprocesses. The editable install
 above supports local development. Release CI installs built wheels and runs
 `python -I -m pytest --require-installed-wheel -q`; the guard rejects checkout or

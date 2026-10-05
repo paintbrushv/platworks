@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Platworks · Local review</title>
+  <link rel="stylesheet" href="/review.css"><script src="/review.js" defer></script>
+</head>
+<body>
+<header><a href="/" class="wordmark">platworks<span> / local review</span></a><span class="local">Files stay on this computer</span></header>
+<div class="shell">
+<aside aria-label="Workspace history">
+  <button id="new-draft" class="primary">New review</button>
+  <h2>Drafts</h2><div id="draft-list"><p class="muted">No drafts yet.</p></div>
+  <h2>Issued history</h2><div id="report-list"><p class="muted">Reports appear after review.</p></div>
+  <p id="history-page" class="help">History page 1</p>
+  <div class="history-nav"><button id="history-newer" disabled>Newer</button><button id="history-older" disabled>Older</button></div>
+  <p class="aside-note">Close this window whenever you need. Start the same workspace again to resume.</p>
+</aside>
+<main>
+  <p class="eyebrow">Ownership &amp; asset management</p>
+  <h1>From source files to a reviewed decision.</h1>
+  <p class="lede">Trace assumptions, inspect the calculation, and record a human decision. Reports remain reviewed drafts; review does not certify financial accuracy.</p>
+  <div id="message" role="status" aria-live="polite" hidden></div>
+  <section class="panel" aria-labelledby="prepare-title">
+    <div class="section-head"><div><p class="step">01 / Prepare</p><h2 id="prepare-title">Sources &amp; assumptions</h2></div><button id="example" type="button">Load synthetic example</button></div>
+    <form id="prepare-form">
+      <div class="grid">
+        <label>Workflow<select id="kind"><option value="acquisition">Acquisition</option><option value="operations">Operations / month close</option></select></label>
+        <label>Prepared by<input id="preparer" required maxlength="120" autocomplete="name"></label>
+      </div>
+      <label>Source data<select id="data-class"><option value="user_supplied">My supplied files</option><option value="synthetic">Synthetic example / test files</option></select></label>
+      <div id="acquisition-files">
+        <label>Canonical acquisition file<input id="inputs-file" type="file" accept=".json,.csv,.xlsx"></label>
+        <p class="help">Canonical JSON, or one <code>pointer,value_json</code> table (XLSX sheet: Inputs). Review every mapped value below. Broker PDFs and vendor-specific exports require normalization before this workflow.</p>
+      </div>
+      <div id="operations-files" hidden>
+        <label>Source layout<select id="ops-layout"><option value="dataset">Canonical dataset JSON</option><option value="tables">Period GL tables + occupancy JSON</option></select></label>
+        <div id="dataset-files"><label>Period dataset<input id="dataset-file" type="file" accept=".json"></label></div>
+        <div id="table-files" hidden>
+          <div class="grid"><label>Actual GL<input id="actuals-file" type="file" accept=".csv,.xlsx"></label><label>Budget GL<input id="budgets-file" type="file" accept=".csv,.xlsx"></label></div>
+          <label>Occupancy snapshot<input id="snapshot-file" type="file" accept=".json"></label>
+          <div class="grid three"><label>Property ID<input id="property" maxlength="120"></label><label>Period<input id="period" type="month"></label><label>Total units<input id="unit-count" type="number" min="1" step="1"></label></div>
+          <p class="help">GL header: <code>property,period,account_code,account_name,category,amount</code>. For XLSX, use one GL sheet and text cells. Every row must match the selected property and month. Expenses use positive costs; credits retain their signs.</p>
+        </div>
+        <label>Correction to issued report<select id="parent-report"><option value="">New period / no parent</option></select></label>
+        <label>Correction reason<input id="correction-reason" maxlength="2000" placeholder="Required when restating an issued period"></label>
+      </div>
+      <div id="source-selection" class="help"></div>
+      <div class="grid three">
+        <label>Policy ID<input id="policy-id" required maxlength="120"></label>
+        <label>Policy version<input id="policy-version" required maxlength="120"></label>
+        <label>Policy as of<input id="policy-date" type="date" required></label>
+      </div>
+      <label>Policy sources &amp; rationale<textarea id="policy-note" required maxlength="2000" rows="2" placeholder="Identify the dated evidence and assumptions you are using."></textarea></label>
+      <div id="acquisition-settings">
+        <div class="grid"><label>Expected total units<input id="expected-units" type="number" min="1" max="100000" step="1"></label><label>Down units<input id="down-units" type="number" min="0" step="1"></label></div>
+        <p class="help">This initial acquisition path supports explicit zero down units. Nonzero or unresolved down schedules require a separately supported analysis.</p>
+        <h3>Downside changes from base</h3><p class="help">Choose each change explicitly. 100 basis points = 1 percentage point. The engine validates both scenarios.</p>
+        <div class="grid four">
+          <label>Rent growth (bps)<input id="rent_growth_delta_bps" type="number" min="-2000" max="0" step="1"></label>
+          <label>Exit cap (bps)<input id="exit_cap_delta_bps" type="number" min="0" max="2000" step="1"></label>
+          <label>Vacancy (bps)<input id="vacancy_delta_bps" type="number" min="0" max="2000" step="1"></label>
+          <label>Expense growth (bps)<input id="opex_growth_delta_bps" type="number" min="0" max="2000" step="1"></label>
+        </div>
+      </div>
+      <label>Unit use &amp; occupancy evidence<textarea id="unit-use-note" required maxlength="2000" rows="2" placeholder="Reconcile residential, occupied, vacant, down, employee and model units to your evidence."></textarea></label>
+      <label>Source reconciliation<textarea id="reconciliation-note" required maxlength="2000" rows="2" placeholder="Explain completeness, time period, signs and any source differences. Identify supporting evidence."></textarea></label>
+      <div id="mapping-editor" hidden><h3>Account mappings</h3><div id="mapping-controls" class="grid"></div><label>Reason for mapping changes<textarea id="mapping-note" maxlength="2000" rows="2"></textarea></label><p class="help">Saving changed mappings creates a new draft and invalidates the prior review.</p></div>
+      <button class="primary" type="submit" id="prepare-button">Prepare draft</button>
+    </form>
+  </section>
+  <section id="review-panel" class="panel" aria-labelledby="review-title" hidden>
+    <div class="section-head"><div><p class="step">02 / Review</p><h2 id="review-title">Inspect the draft</h2></div><span id="draft-status" class="badge"></span></div>
+    <div id="findings"></div>
+    <div id="source-links"></div>
+    <details><summary>Source mappings &amp; reconciliation</summary><p class="help">Values below come from the retained source bytes. Changed operating categories are shown in the normalized input.</p><div class="table-wrap"><table id="mapping-table"><thead><tr><th>Field</th><th>Source / location</th><th>Source value</th></tr></thead><tbody></tbody></table></div></details>
+    <details><summary>Effective base inputs &amp; policy</summary><pre id="normalized"></pre><pre id="effective-policy"></pre></details>
+    <details><summary>Producer identity &amp; review fingerprint</summary><pre id="identity"></pre></details>
+    <div id="results" hidden><h3>Calculation</h3><div id="result-summary"></div><h3>Questions for ownership review</h3><ul id="owner-questions"></ul><details><summary>Complete results &amp; effective scenario inputs</summary><pre id="result-json"></pre></details></div>
+    <form id="decision-form">
+      <h3 id="decision-title">Authorize the base and downside calculation</h3>
+      <p id="decision-help">Review the retained source files, mappings, validation and policy before authorizing execution.</p>
+      <label>Reviewed by<input id="reviewer" required maxlength="120" autocomplete="name"></label>
+      <label>Decision notes / answers to owner questions<textarea id="review-note" required maxlength="2000" rows="3" placeholder="Record your reasoning and address the visible warnings or questions."></textarea></label>
+      <label class="check"><input id="confirmed" type="checkbox" required> I have reviewed this exact draft, its sources, assumptions and visible exceptions, and authorize the action shown below.</label>
+      <button id="decision-button" class="primary" type="submit">Authorize calculation</button>
+    </form>
+    <div id="issued" hidden><h3>Recorded in immutable history</h3><p>The retained report and original files remain available when a later correction is issued.</p><button id="download-report" type="button">Download reviewed report</button></div>
+  </section>
+</main>
+</div>
+</body>
+</html>
