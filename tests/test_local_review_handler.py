@@ -152,3 +152,52 @@ def test_default_http_port_accepts_browser_serialization(tmp_path, host, origin)
         == 403
     )
     assert dispatch(handler, "GET", "/api/state", port=81, host=host, origin=origin)[0] == 403
+
+
+def test_retained_sources_keep_role_filenames_for_identical_bytes(tmp_path):
+    import base64
+
+    handler = create_handler(tmp_path / "review", "synthetic-test-capability")
+    _, _, raw = dispatch(handler, "GET", "/api/example?kind=operations")
+    payload = json.loads(raw)
+    data = json.loads(base64.b64decode(payload["files"]["dataset"]["data_base64"]))
+    gl = (
+        "property,period,account_code,account_name,category,amount\n"
+        "synthetic-ops,2026-05,4000,Rent,rental income,0.30\n"
+    ).encode()
+    source_bytes = {"actuals": gl, "budgets": gl, "snapshot": json.dumps(data["snapshot"]).encode()}
+    names = {"actuals": "actuals.csv", "budgets": "budgets.csv", "snapshot": "snapshot.json"}
+    payload["settings"].update(property="synthetic-ops", period="2026-05", unit_count=10)
+    payload["files"] = {
+        role: {"filename": names[role], "data_base64": base64.b64encode(raw).decode()}
+        for role, raw in source_bytes.items()
+    }
+    status, _, raw = dispatch(handler, "POST", "/api/prepare", payload)
+    assert status == 200, raw
+    original = json.loads(raw)
+    assert original["sources"]["actuals"]["sha256"] == original["sources"]["budgets"]["sha256"]
+    payload["files"] = {
+        role: {"draft_id": original["id"], "sha256": ref["sha256"]}
+        for role, ref in original["sources"].items()
+    }
+    payload["settings"]["policy_note"] = "Revised synthetic policy without changing sources"
+    status, _, raw = dispatch(handler, "POST", "/api/prepare", payload)
+    assert status == 200, raw
+    revised = json.loads(raw)
+    assert revised["sources"] == original["sources"]
+    for role, ref in revised["sources"].items():
+        status, headers, body = dispatch(
+            handler,
+            "GET",
+            "/api/source?sha=" + ref["sha256"] + "&draft_id=" + revised["id"] + "&role=" + role,
+        )
+        assert status == 200 and names[role].encode() in headers
+        assert body == source_bytes[role]
+    # A hash alone cannot select a filename when several sources share its bytes.
+    sha = original["sources"]["actuals"]["sha256"]
+    status, _, raw = dispatch(handler, "GET", "/api/source?sha=" + sha)
+    assert status == 409 and json.loads(raw)["error"]["code"] == "AMBIGUOUS_SOURCE"
+    payload["files"]["actuals"]["sha256"] = original["sources"]["snapshot"]["sha256"]
+    assert dispatch(handler, "POST", "/api/prepare", payload)[0] == 404
+    payload["files"]["actuals"] = {"sha256": sha}
+    assert dispatch(handler, "POST", "/api/prepare", payload)[0] == 409

@@ -540,18 +540,36 @@ class Workspace:
                 for row in rows
             ]
 
-    def source(self, sha):
+    def source(self, sha, *, draft_id=None, role=None):
         with self._connect() as connection:
             # Only source blobs referenced by a draft are downloadable here.
-            row = connection.execute(
-                "SELECT draft,filename FROM source_index WHERE sha=? ORDER BY rowid LIMIT 1",
-                (sha,),
-            ).fetchone()
+            if draft_id is not None or role is not None:
+                if not isinstance(draft_id, str) or not isinstance(role, str):
+                    refuse("INVALID_INPUT", "Select both the retained draft and source role.")
+                row = connection.execute(
+                    "SELECT draft,filename FROM source_index WHERE sha=? AND draft=? AND role=?",
+                    (sha, draft_id, role),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    "SELECT draft,filename FROM source_index WHERE sha=? ORDER BY rowid LIMIT 1",
+                    (sha,),
+                ).fetchone()
+                if (
+                    row
+                    and connection.execute(
+                        "SELECT 1 FROM source_index WHERE sha=? AND filename!=? LIMIT 1",
+                        (sha, row[1]),
+                    ).fetchone()
+                ):
+                    refuse(
+                        "AMBIGUOUS_SOURCE", "Select the source from its retained draft and role."
+                    )
             if row:
                 draft = self._draft(connection, row[0])
                 if not any(
-                    s["sha256"] == sha and s["filename"] == row[1]
-                    for s in draft["sources"].values()
+                    s["sha256"] == sha and s["filename"] == row[1] and (role is None or r == role)
+                    for r, s in draft["sources"].items()
                 ):
                     refuse("INTEGRITY_ERROR", "Source index does not match its retained draft.")
                 return row[1], self._blob(connection, sha)

@@ -128,6 +128,54 @@ def verify(output):
                     page.set_viewport_size({"width": 390, "height": 844})
                     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
                     page.screenshot(path=str(output / "mobile.png"), full_page=True)
+                    # Identical GL bytes still have distinct role-specific filenames.
+                    page.set_viewport_size({"width": 1440, "height": 1000})
+                    page.locator("#new-draft").click()
+                    page.locator("#kind").select_option("operations")
+                    page.locator("#example").click()
+                    expect(page.locator("#message")).to_contain_text("Synthetic example loaded")
+                    page.locator("#ops-layout").select_option("tables")
+                    page.locator("#property").fill("synthetic-shared-files")
+                    page.locator("#period").fill("2026-05")
+                    page.locator("#unit-count").fill("10")
+                    gl = (
+                        "property,period,account_code,account_name,category,amount\n"
+                        "synthetic-shared-files,2026-05,4000,Rent,rental income,0.30\n"
+                    ).encode()
+                    shared = {
+                        "actuals": ("actuals.csv", gl),
+                        "budgets": ("budgets.csv", gl),
+                        "snapshot": ("snapshot.json", json.dumps(data["snapshot"]).encode()),
+                    }
+                    for role, (filename, raw) in shared.items():
+                        path = work / filename
+                        path.write_bytes(raw)
+                        page.locator(f"#{role}-file").set_input_files(path)
+                    page.locator("#prepare-button").click()
+                    expect(page.locator("#draft-status")).to_contain_text("awaiting report review")
+                    page.reload()
+                    page.locator("#draft-list button").filter(
+                        has_text="synthetic-shared-files"
+                    ).first.click()
+                    page.locator("#policy-note").fill("Synthetic changed policy, retained files")
+                    page.locator("#prepare-button").click()
+                    expect(page.locator("#decision-button")).to_be_enabled()
+                    confirm()
+                    expect(page.locator("#issued")).to_be_visible()
+                    retained = report()
+                    for role, (filename, raw) in shared.items():
+                        assert retained["sources"][role]["filename"] == filename
+                        with page.expect_download() as pending:
+                            page.locator("#source-links .source").filter(
+                                has_text=filename
+                            ).get_by_role("button").click()
+                        downloaded = pending.value
+                        assert downloaded.suggested_filename == filename
+                        assert Path(downloaded.path()).read_bytes() == raw
+                    assert (
+                        retained["sources"]["actuals"]["sha256"]
+                        == retained["sources"]["budgets"]["sha256"]
+                    )
                     # Seed unapproved synthetic drafts through the actual workspace API.
                     # Older issued history must remain reachable beyond the first 100 rows.
                     seed = example("acquisition")
@@ -180,6 +228,7 @@ def verify(output):
             "mobile_layout",
             "history_pagination",
             "padded_account_mapping",
+            "retained_source_roles",
         ],
     }
 

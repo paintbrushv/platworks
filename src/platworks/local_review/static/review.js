@@ -46,7 +46,7 @@ function layout() {
 }
 function chosenSources() {
   $("source-selection").textContent = Object.entries(selected).map(([role, item]) =>
-    `${labelFor(role)}: ${item.filename || "retained source snapshot"}`).join(" · ");
+    `${labelFor(role)}: ${item.filename || current?.sources?.[role]?.filename || "retained source snapshot"}`).join(" · ");
 }
 function selectParent(parent) {
   if (parent && ![...$("parent-report").options].some((o) => o.value === parent)) {
@@ -123,7 +123,7 @@ function show(draft, restore) {
   if (restore) {
     $("kind").value = draft.kind;
     $("ops-layout").value = draft.sources.dataset ? "dataset" : "tables";
-    selected = Object.fromEntries(Object.entries(draft.sources).map(([role, source]) => [role, {sha256: source.sha256}]));
+    selected = Object.fromEntries(Object.entries(draft.sources).map(([role, source]) => [role, {sha256: source.sha256, draft_id: draft.id}]));
     for (const role of ["inputs", "dataset", "actuals", "budgets", "snapshot"]) $(role + "-file").value = "";
     setSettings(draft.settings); chosenSources();
   }
@@ -141,7 +141,7 @@ function show(draft, restore) {
   for (const [role, source] of Object.entries(draft.sources)) {
     const row = node("div", undefined, "source"), caption = node("div", labelFor(role) + " · " + source.filename);
     caption.append(node("small", "SHA-256 " + source.sha256)); const button = node("button", "Download source");
-    button.onclick = () => busy(button, () => download("/api/source?sha=" + source.sha256, source.filename)); row.append(caption, button); $("source-links").append(row);
+    button.onclick = () => busy(button, () => download("/api/source?" + new URLSearchParams({sha: source.sha256, draft_id: draft.id, role}), source.filename)); row.append(caption, button); $("source-links").append(row);
   }
   const tbody = $("mapping-table").querySelector("tbody"); tbody.replaceChildren();
   for (const mapping of draft.mappings) {

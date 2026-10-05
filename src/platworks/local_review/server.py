@@ -107,7 +107,11 @@ def create_handler(workspace, token):
                     value = workspace.report(params["id"][0])
                     return self.send(200, encode(value), filename="platworks-reviewed-report.json")
                 elif path == "/api/source":
-                    name, raw = workspace.source(params["sha"][0])
+                    name, raw = workspace.source(
+                        params["sha"][0],
+                        draft_id=params.get("draft_id", [None])[0],
+                        role=params.get("role", [None])[0],
+                    )
                     return self.send(200, raw, "application/octet-stream", name)
                 elif path == "/api/example":
                     kind = params["kind"][0]
@@ -142,8 +146,10 @@ def create_handler(workspace, token):
                         refuse("INPUT_LIMIT", "Select one to four files.")
                     sources = {}
                     for role, item in request["files"].items():
-                        if set(item) == {"sha256"}:
-                            sources[role] = workspace.source(item["sha256"])
+                        if set(item) == {"sha256", "draft_id"}:
+                            sources[role] = workspace.source(
+                                item["sha256"], draft_id=item["draft_id"], role=role
+                            )
                         elif set(item) == {"filename", "data_base64"}:
                             if len(item["data_base64"]) > (MAX_FILE + 2) // 3 * 4:
                                 refuse("INPUT_LIMIT", "Each source is limited to 2 MiB.")
