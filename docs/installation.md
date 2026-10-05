@@ -64,6 +64,12 @@ stdio servers, compares public API/wrapper/MCP backsolve output, and checks
 canonical operating import, integer cents, report issuance, a one-cent correction,
 preservation of the original report, and harness review. Temporary files are
 removed. It does not establish real-file acceptance or assistant-host support.
+It also exercises the local reviewed workflows with simulated decisions: two
+acquisition approvals, restart, operating issuance and a linked cent correction.
+The probe explicitly records that no human pilot took place.
+
+Use `platworks review ./my-review-workspace` for the local browser interface.
+See [local review](local-review.md) for supported layouts, limits and walkthroughs.
 
 No producer path override is needed. Explicit `PLAT_BOXSCORE_EXACT_BIN` and
 `PLAT_BOXSCORE_EXACT_SHA256` remain host configuration for reviewed deployments.

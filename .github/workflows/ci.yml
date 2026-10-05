@@ -114,6 +114,13 @@ jobs:
           pip check
           python scripts/verify_catalog.py
           python -I -m pytest --require-installed-wheel -q
+      - name: Synthetic browser review journeys
+        if: runner.os == 'Linux' && matrix.python == '3.12'
+        shell: bash
+        run: |
+          pip install playwright==1.62.0
+          python -m playwright install --with-deps chromium
+          python -I scripts/browser_review.py --output browser-evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -121,3 +128,4 @@ jobs:
           path: |
             *-check.json
             release-sources.json
+            browser-evidence/
