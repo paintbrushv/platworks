@@ -4,6 +4,8 @@ import io
 import json
 from types import SimpleNamespace
 
+import pytest
+
 from platworks.local_review.server import create_handler
 
 
@@ -22,7 +24,9 @@ class RequestStream:
         pass
 
 
-def dispatch(handler, method, path, body=None, *, auth=True, origin=True, host="127.0.0.1:8765"):
+def dispatch(
+    handler, method, path, body=None, *, auth=True, origin=True, host="127.0.0.1:8765", port=8765
+):
     raw = json.dumps(body).encode() if body is not None else b""
     headers = [
         f"{method} {path} HTTP/1.0",
@@ -33,9 +37,11 @@ def dispatch(handler, method, path, body=None, *, auth=True, origin=True, host="
     if auth:
         headers.append("Authorization: Bearer synthetic-test-capability")
     if origin:
-        headers.append("Origin: http://127.0.0.1:8765")
+        headers.append(
+            "Origin: " + (origin if isinstance(origin, str) else f"http://127.0.0.1:{port}")
+        )
     stream = RequestStream("\r\n".join(headers).encode() + b"\r\n\r\n" + raw)
-    handler(stream, ("127.0.0.1", 50000), SimpleNamespace(server_port=8765))
+    handler(stream, ("127.0.0.1", 50000), SimpleNamespace(server_port=port))
     head, response = stream.output.getvalue().split(b"\r\n\r\n", 1)
     return int(head.split(b" ")[1]), head, response
 
@@ -125,3 +131,24 @@ def test_handler_history_pagination_and_bounds(tmp_path):
     assert dispatch(handler, "GET", "/api/draft?id=" + older["drafts"][0]["id"])[0] == 200
     for query in ("offset=-1", "limit=101", "limit=0"):
         assert dispatch(handler, "GET", "/api/state?" + query)[0] == 409
+
+
+@pytest.mark.parametrize(
+    "host,origin",
+    [
+        ("127.0.0.1", "http://127.0.0.1"),
+        ("127.0.0.1:80", "http://127.0.0.1:80"),
+    ],
+)
+def test_default_http_port_accepts_browser_serialization(tmp_path, host, origin):
+    handler = create_handler(tmp_path / "review", "synthetic-test-capability")
+    options = {"port": 80, "host": host, "origin": origin}
+    assert dispatch(handler, "GET", "/", auth=False, **options)[0] == 200
+    status, _, raw = dispatch(handler, "GET", "/api/example?kind=operations", **options)
+    assert status == 200
+    assert dispatch(handler, "POST", "/api/prepare", json.loads(raw), **options)[0] == 200
+    assert (
+        dispatch(handler, "GET", "/api/state", port=80, host="127.0.0.1:81", origin=origin)[0]
+        == 403
+    )
+    assert dispatch(handler, "GET", "/api/state", port=81, host=host, origin=origin)[0] == 403

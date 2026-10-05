@@ -54,10 +54,15 @@ def create_handler(workspace, token):
 
         def boundary(self, private):
             host = f"127.0.0.1:{self.server.server_port}"
-            if self.headers.get_all("Host", []) != [host]:
+            allowed_hosts = {host}
+            if self.server.server_port == 80:
+                allowed_hosts.add("127.0.0.1")  # Browsers omit the default HTTP port.
+            supplied_hosts = self.headers.get_all("Host", [])
+            if len(supplied_hosts) != 1 or supplied_hosts[0] not in allowed_hosts:
                 refuse("LOCAL_ORIGIN_REQUIRED", "Use the exact local review address.")
             origin = self.headers.get_all("Origin", [])
-            if origin and origin != ["http://" + host]:
+            allowed_origins = {"http://" + value for value in allowed_hosts}
+            if origin and (len(origin) != 1 or origin[0] not in allowed_origins):
                 refuse("LOCAL_ORIGIN_REQUIRED", "Cross-origin access is refused.")
             if private:
                 auth = self.headers.get_all("Authorization", [])
@@ -65,7 +70,7 @@ def create_handler(workspace, token):
                     auth[0].encode("utf-8"), ("Bearer " + token).encode("utf-8")
                 ):
                     refuse("LOCAL_SESSION_REQUIRED", "Open the session link printed by the CLI.")
-            if self.command == "POST" and origin != ["http://" + host]:
+            if self.command == "POST" and not origin:
                 refuse("LOCAL_ORIGIN_REQUIRED", "A local browser review origin is required.")
 
         def dispatch(self):
