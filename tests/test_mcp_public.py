@@ -192,3 +192,74 @@ def test_mcp_rejects_coercion_and_undeclared_arguments():
             assert "canary" not in json.dumps(payload)
 
     asyncio.run(run())
+
+
+def test_http_disconnect_cancels_sdk_dispatcher_and_worker(tmp_path, monkeypatch):
+    from platworks import scenarios
+
+    original = asyncio.create_subprocess_exec
+    pidfile = tmp_path / "disconnected-worker.txt"
+    program = f"import os,time; open({str(pidfile)!r},'w').write(str(os.getpid())); time.sleep(30)"
+
+    async def spawn(*args, **kwargs):
+        return await original(sys.executable, "-c", program, **kwargs)
+
+    monkeypatch.setattr(scenarios.asyncio, "create_subprocess_exec", spawn)
+
+    async def run():
+        app = create_app(hosts=["test.local"])
+        raw = json.dumps(
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "tools/call",
+                "params": {"name": "underwrite_run", "arguments": {"inputs": {}}},
+            }
+        ).encode()
+        delivered = False
+
+        async def receive():
+            nonlocal delivered
+            if not delivered:
+                delivered = True
+                return {"type": "http.request", "body": raw, "more_body": False}
+            while not pidfile.exists():
+                await asyncio.sleep(0.01)
+            return {"type": "http.disconnect"}
+
+        async def send(message):
+            pass
+
+        scope = {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": "/mcp",
+            "raw_path": b"/mcp",
+            "query_string": b"",
+            "root_path": "",
+            "server": ("test.local", 80),
+            "client": ("127.0.0.1", 12345),
+            "headers": [
+                (b"host", b"test.local"),
+                (b"content-type", b"application/json"),
+                (b"accept", b"application/json, text/event-stream"),
+            ],
+        }
+        async with app.app.router.lifespan_context(app.app):
+            await asyncio.wait_for(app(scope, receive, send), timeout=3)
+            # The SDK starts the per-request dispatcher in its lifespan task
+            # group. It must finish after the transport closes, while the server
+            # remains live; shutdown must not be what kills the worker.
+            for _ in range(100):
+                try:
+                    os.kill(int(pidfile.read_text()), 0)
+                except ProcessLookupError:
+                    break
+                await asyncio.sleep(0.01)
+            else:
+                pytest.fail("Disconnected HTTP request left its worker running")
+
+    asyncio.run(run())

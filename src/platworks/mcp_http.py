@@ -7,7 +7,9 @@ import logging
 import os
 import sys
 import threading
+from contextlib import suppress
 
+import anyio
 from mcp.server.transport_security import TransportSecuritySettings
 
 from platworks.local_review.common import decode
@@ -113,19 +115,46 @@ class PublicBoundary:
             except Exception:
                 return await reply(400, "invalid_json")
             delivered = False
+            disconnected = asyncio.Event()
+
+            async def watch_disconnect():
+                while True:
+                    message = await receive()
+                    if message["type"] == "http.disconnect":
+                        disconnected.set()
+                        return
 
             async def replay():
                 nonlocal delivered
                 if not delivered:
                     delivered = True
                     return {"type": "http.request", "body": body, "more_body": False}
-                return await receive()
+                await disconnected.wait()
+                return {"type": "http.disconnect"}
 
+            # JSON responses otherwise wait for the entire calculation without
+            # observing a closed socket. Terminating the per-request SDK transport
+            # cancels its dispatcher and the financial worker promptly.
+            request_task = asyncio.create_task(self.app(scope, replay, safe_send))
+            disconnect_task = asyncio.create_task(watch_disconnect())
             try:
-                await self.app(scope, replay, safe_send)
+                done, _ = await asyncio.wait(
+                    {request_task, disconnect_task}, return_when=asyncio.FIRST_COMPLETED
+                )
+                if disconnect_task in done and disconnected.is_set():
+                    request_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await request_task
+                else:
+                    await request_task
             except Exception:
-                if not started:
+                if not started and not disconnected.is_set():
                     await reply(500, "request_failed")
+            finally:
+                request_task.cancel()
+                disconnect_task.cancel()
+                with anyio.CancelScope(shield=True):
+                    await asyncio.gather(request_task, disconnect_task, return_exceptions=True)
         finally:
             self.slots.release()
 
