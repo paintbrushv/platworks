@@ -106,6 +106,8 @@ and [acceptance record](../integrations/acceptance.json). For each host:
 
 All successful scenario calls carry `plat.scenario/1`, `unverified_scenario`,
 `human_approval: not_granted`, `certified: false`, producer versions and hashes.
+Common scenario envelopes also echo the structured arguments actually evaluated,
+including the assumed values. The legacy local review omits its database path.
 The result hash covers the response before the scenario envelope is added; the
 input hash covers `{tool, arguments}` after MCP argument defaults/coercion.
 An operating preview may contain a disposable revision ID; it cannot be retrieved

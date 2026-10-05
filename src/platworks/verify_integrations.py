@@ -93,6 +93,13 @@ async def exercise(client, *, analysis):
         body = dict(scenario)
         proof = body.pop("scenario")
         assert proof["result_sha256"] == sha256(body)
+        assert proof["input_sha256"] == sha256(
+            {
+                "tool": "preview_operations",
+                "arguments": proof["supplied_arguments"],
+            }
+        )
+        assert proof["supplied_arguments"]["inputs"] == example["inputs"]
         acquisition = await call(
             "underwrite_run",
             {

@@ -1,6 +1,7 @@
 """Bounded, unapproved scenario calls to the existing financial producers."""
 
 import asyncio
+import copy
 import inspect
 import json
 import os
@@ -175,6 +176,7 @@ def calculate(name, arguments):
     """Worker entry point. Errors never echo input values, paths or tracebacks."""
     try:
         validate_request(name, arguments)
+        supplied = copy.deepcopy(arguments)
         result = (
             preview_operations(arguments.get("inputs"))
             if name == "preview_operations"
@@ -183,7 +185,7 @@ def calculate(name, arguments):
         if "error" in result:
             code = result["error"].get("code")
             return refusal(code if code in ERROR_CODES else "PRODUCER_REFUSAL")
-        return annotate(name, arguments, result)
+        return annotate(name, supplied, result)
     except ImportError:
         return refusal("BACKEND_UNAVAILABLE")
     except Exception as error:
@@ -215,6 +217,14 @@ def annotate(name, arguments, result):
         "input_sha256": sha256({"tool": name, "arguments": arguments}),
         "result_sha256": sha256(result),
         "producer_versions": versions,
+        # Public/common scenarios echo the structured arguments actually evaluated
+        # so callers can reproduce the hash and inspect assumed values. The local
+        # legacy review keeps its database path private.
+        "supplied_arguments": (
+            arguments
+            if name != "ops_review"
+            else {key: value for key, value in arguments.items() if key != "db_path"}
+        ),
         "assumptions": result.get(
             "effective_assumptions",
             {

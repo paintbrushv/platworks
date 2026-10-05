@@ -263,3 +263,21 @@ def test_http_disconnect_cancels_sdk_dispatcher_and_worker(tmp_path, monkeypatch
                 pytest.fail("Disconnected HTTP request left its worker running")
 
     asyncio.run(run())
+
+
+def test_input_identity_is_captured_before_producer_mutation(monkeypatch):
+    from platworks import wrappers
+    from platworks.library import sha256
+
+    arguments = {"inputs": {"source_fact": "original"}}
+    expected = sha256({"tool": "underwrite_run", "arguments": arguments})
+
+    def producer(inputs):
+        inputs["source_fact"] = "producer-normalized"
+        return {"metrics": {"source_fact": inputs["source_fact"]}}
+
+    monkeypatch.setitem(wrappers.PRODUCT_TOOL_IMPLEMENTATIONS, "underwrite_run", producer)
+    result = calculate("underwrite_run", arguments)
+    assert result["scenario"]["input_sha256"] == expected
+    assert result["scenario"]["supplied_arguments"]["inputs"]["source_fact"] == "original"
+    assert result["metrics"]["source_fact"] == "producer-normalized"
